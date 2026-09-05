@@ -29,6 +29,7 @@
                 <Button Content="찾아보기" DockPanel.Dock="Right" Margin="4,0,0,0" Click="BrowseExecutable_Click"/>
                 <TextBox x:Name="ExecutablePathTextBox" IsReadOnly="True"/>
             </DockPanel>
+            <Button Content="게임 폴더 이름 변경..." HorizontalAlignment="Left" Margin="0,0,0,10" Click="RenameGameFolder_Click"/>
 
             <StackPanel x:Name="ArchiveInfoPanel" Margin="0,0,0,10" Visibility="Collapsed">
                 <TextBlock Text="압축 정보"/>

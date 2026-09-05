@@ -147,6 +147,82 @@ public partial class GameInfoWindow : Window
         _onChanged();
     }
 
+    /// <summary>"게임 폴더 이름 변경" 버튼 — 실행 파일이 들어 있는 폴더 자체의 이름을 바꾸고, `ExecutablePath`를
+    /// 새 위치로 갱신한다. 압축 상태라 폴더가 실제로 존재하지 않으면(doc/game-management.md "게임 압축" 참고)
+    /// 안내만 하고 아무 것도 하지 않는다.</summary>
+    private void RenameGameFolder_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_item.ExecutablePath))
+        {
+            MessageBox.Show(this, "실행 파일 경로가 지정되지 않아 폴더를 찾을 수 없습니다.", "폴더 이름 변경", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var currentDir = Path.GetDirectoryName(_item.ExecutablePath);
+        if (string.IsNullOrEmpty(currentDir) || !Directory.Exists(currentDir))
+        {
+            MessageBox.Show(this, "게임 폴더를 찾을 수 없습니다.", "폴더 이름 변경", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var currentName = Path.GetFileName(currentDir);
+        var input = RenameFolderWindow.Prompt(this, currentName);
+        if (input is null)
+        {
+            return;
+        }
+
+        var newName = FileNameHelper.Sanitize(input);
+        if (newName == currentName)
+        {
+            return;
+        }
+
+        var parentDir = Path.GetDirectoryName(currentDir);
+        if (string.IsNullOrEmpty(parentDir))
+        {
+            MessageBox.Show(this, "상위 폴더를 찾을 수 없습니다.", "폴더 이름 변경", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var newDir = Path.Combine(parentDir, newName);
+
+        try
+        {
+            if (string.Equals(newDir, currentDir, StringComparison.OrdinalIgnoreCase))
+            {
+                // 대소문자만 바꾸는 경우 — Directory.Move는 대소문자만 다른 같은 경로로는 아무 일도 하지
+                // 않으므로(윈도우 파일시스템은 대소문자를 구분하지 않는다), 임시 이름을 한 번 거쳐 간다.
+                var tempDir = Path.Combine(parentDir, $"{newName}.renaming-{Guid.NewGuid():N}");
+                Directory.Move(currentDir, tempDir);
+                Directory.Move(tempDir, newDir);
+            }
+            else
+            {
+                if (Directory.Exists(newDir) || File.Exists(newDir))
+                {
+                    MessageBox.Show(this, $"'{newName}' 이름이 이미 있습니다.", "폴더 이름 변경", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                Directory.Move(currentDir, newDir);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"폴더 이름을 바꾸지 못했습니다.\n{ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        var relativeExecutablePath = Path.GetRelativePath(currentDir, _item.ExecutablePath);
+        var newExecutablePath = Path.Combine(newDir, relativeExecutablePath);
+
+        _item.ExecutablePath = newExecutablePath;
+        ExecutablePathTextBox.Text = newExecutablePath;
+        _item.RefreshExecutableValid();
+        _onChanged();
+    }
+
     private void ScreenshotArea_DragOver(object sender, DragEventArgs e)
     {
         e.Effects = DragDropImageHelper.CanAccept(e.Data) ? DragDropEffects.Copy : DragDropEffects.None;

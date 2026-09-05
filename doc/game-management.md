@@ -2,7 +2,7 @@
 
 > [메인 지시서](../CLAUDE.md)의 하위 문서. 게임 카드 목록(메인 화면), 실행, 정보 창을 다룬다. 썸네일 저장·드래그앤드롭 공용 인프라는 [공통 관리](common-management.md) 참고.
 
-**관련 파일**: `GameItem.cs`, `GameLibraryRepository.cs`, `MainWindow.xaml`/`.xaml.cs`, `GameInfoWindow.xaml`/`.xaml.cs`, `GameCardSizeSettings.cs`, `GameScreenshotSizeSettings.cs`, `EmptyPathToVisibleConverter.cs`, `SelectExecutableWindow.xaml`/`.xaml.cs`, `FileNameHelper.cs`
+**관련 파일**: `GameItem.cs`, `GameLibraryRepository.cs`, `MainWindow.xaml`/`.xaml.cs`, `GameInfoWindow.xaml`/`.xaml.cs`, `GameCardSizeSettings.cs`, `GameScreenshotSizeSettings.cs`, `EmptyPathToVisibleConverter.cs`, `SelectExecutableWindow.xaml`/`.xaml.cs`, `RenameFolderWindow.xaml`/`.xaml.cs`, `FileNameHelper.cs`
 
 ## 데이터 모델 (`GameItem`)
 
@@ -103,6 +103,7 @@
 - **게임 이름**, **게임 버전** — 한 줄 텍스트박스
 - **게임 내용** — 여러 줄 텍스트박스 (`Description`)
 - **실행 파일 경로** — 텍스트박스 + "찾아보기"(`OpenFileDialog`) 버튼으로 `ExecutablePath` 지정/변경
+- **게임 폴더 이름 변경...** 버튼(`RenameGameFolder_Click`, 2026-09-06 추가, 사용자 요청) — 실행 파일이 들어 있는 폴더(`Path.GetDirectoryName(ExecutablePath)`) 자체의 이름을 바꾼다. 작은 입력 대화상자(`RenameFolderWindow`, `SelectExecutableWindow`와 같은 패턴)에 현재 폴더 이름이 미리 채워져 있고, 새 이름을 입력하고 확인하면 `Directory.Move`로 폴더 이름을 바꾼 뒤 `ExecutablePath`를 새 위치 기준으로 갱신한다(실행 파일이 폴더 바로 밑이 아니라 그 밑 하위 폴더에 있어도 상대 경로를 유지한다). 새 이름은 `FileNameHelper.Sanitize`로 파일명에 못 쓰는 문자를 정리하고, 대소문자만 바꾸는 경우(윈도우는 대소문자를 구분하지 않으므로 `Directory.Move`가 같은 경로로 인식해 아무 일도 하지 않는다)는 임시 이름을 한 번 거쳐 우회한다. 압축 상태라 폴더가 실제로 존재하지 않거나(위 "게임 압축" 참고), 같은 이름의 폴더/파일이 이미 있으면 안내만 하고 아무 것도 하지 않는다. **게임 이름(`Name`)과는 무관한 별개의 동작**이다 — 폴더 이름만 바뀌고 카드에 표시되는 `DisplayName`은 그대로다.
 - **압축 정보** — 압축 상태(`IsCompressed`)일 때만 보이는 패널. 압축 파일 경로/크기/압축 일시를 보여준다 (편집 불가, 표시 전용). 메인 화면에서 압축/압축 해제를 하면 이 창이 열려 있어도 즉시 갱신된다.
 - **게임 요약** — 캡처 이미지 갤러리. **첫 번째 슬롯은 항상 메인 화면 대표 썸네일(`ThumbnailPath`)이다** — 실제 `Screenshots` 목록의 항목이 아니라 표시 전용으로 맨 앞에 얹는 것이며("대표 이미지" 라벨 표시), 여기서 삭제할 수 없다(대표 썸네일을 바꾸려면 메인 화면 카드에 새 이미지를 드래그드롭한다). 대표 썸네일이 아직 없으면 이 슬롯은 빈 이미지 placeholder("썸네일 없음")로 보여준다. 두 번째 슬롯부터가 실제 `Screenshots`이며, 창 안에 이미지 파일을 드래그드롭하면 뒤에 추가된다. 개별 삭제는 항목 우클릭으로 처리하며, 목록에서 빼는 동시에 이미지 파일(`images\{게임 Id}\`)도 함께 지운다(`GameInfoWindow.DeleteScreenshotFiles`) — 대표 썸네일 슬롯은 삭제 메뉴 자체가 나타나지 않는다. **항목을 클릭하면 원본 이미지를 크게 보여주는 뷰어가 열린다** (video-vault의 `OriginalImageWindow`와 동일한 방식 — 아무 곳이나 클릭하면 닫힘; 대표 썸네일 슬롯이 비어 있을 때 클릭하면 아무 반응도 하지 않는다). 메인 화면에서 대표 썸네일을 바꾸면 이 창이 열려 있어도 첫 슬롯이 즉시 따라간다.
 - **게임 요약 이미지 크기**: 320x240(기본) / 160x120 / 80x60 세 프리셋을 전역 설정으로 전환한다 (`GameScreenshotSizeSettings`, 메인 화면의 `GameCardSizeSettings`와 같은 패턴이지만 프리셋이 3개이고 카드 크기와는 별개로 관리된다 — 두 설정을 동시에 같은 값으로 맞출 필요는 없다). 전환하면 열려 있는 갤러리의 모든 이미지가 동시에 바뀐다.
