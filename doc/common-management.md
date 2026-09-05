@@ -2,7 +2,7 @@
 
 > [메인 지시서](../CLAUDE.md)의 하위 문서. 특정 게임 항목에 속하지 않고 앱 전체에 적용되는 것들 — 저장 경로, 설정, 썸네일/드래그앤드롭 공용 인프라, 오류 처리 — 을 모은다. 게임 카드/실행/정보 창 자체는 [게임 관리](game-management.md) 참고.
 
-**관련 파일 (예정, 아직 미구현)**: `App.xaml`/`.xaml.cs`, `AppPaths.cs`, `AppSettings.cs`, `SettingsRepository.cs`, `ImageLoadHelper.cs`, `ThumbnailPathConverter.cs`, `ThumbnailHelper.cs`, `DragDropImageHelper.cs`
+**관련 파일 (예정, 아직 미구현)**: `App.xaml`/`.xaml.cs`, `AppPaths.cs`, `AppSettings.cs`, `SettingsRepository.cs`, `ImageLoadHelper.cs`, `ThumbnailPathConverter.cs`, `ThumbnailHelper.cs`, `DragDropImageHelper.cs`, `OriginalImageWindow.xaml`/`.xaml.cs`, `SingleInstanceWindow.cs`, `BackupService.cs`
 
 ## video-vault에서 이식하는 인프라
 
@@ -12,6 +12,8 @@
 - **`ThumbnailPathConverter`**: XAML에서 `Image.Source`를 문자열 경로에 바인딩할 때 `ImageLoadHelper.Load`를 거치도록 하는 `IValueConverter`.
 - **`ThumbnailHelper`**: 이미지를 원본과 리사이즈본(320x240 이내, 가로세로 비율 유지) 두 파일로 저장하고, 소스로 쓰인 임시 파일은 정리한다.
 - **`DragDropImageHelper`**: 드래그앤드롭된 데이터에서 이미지를 꺼내 파일로 확보한다. 로컬 파일뿐 아니라 브라우저에서 드래그한 이미지(웹 URL/`data:` URI/렌더링된 비트맵)도 지원한다.
+- **`OriginalImageWindow`**: 리사이즈 전 원본 이미지를 크게 보여주고, 아무 곳이나 클릭하면 닫힌다. [게임 관리](game-management.md)의 게임 요약 갤러리 항목 클릭 시 사용.
+- **`SingleInstanceWindow<T>`**: 창 종류(T)별로 현재 열려 있는 인스턴스를 추적해, 같은 종류의 새 창을 열면 기존 창을 먼저 닫는다. [게임 관리](game-management.md)의 `GameInfoWindow`(한 번에 하나만 열림)에 사용.
 
 ## 저장 위치
 
@@ -32,15 +34,29 @@ video-vault의 `AppPaths` 패턴을 따라 `%LOCALAPPDATA%\GamePlatform\` 아래
 ## 설정 관리 (`settings.json`)
 
 - 카드 크기 프리셋(320x240 / 160x120) — 마지막 선택값을 기억했다가 다음 실행 시 복원한다.
+- 아래 "백업"의 마지막 일간/주간 백업 수행 시각(`LastDailyBackupUtc`/`LastWeeklyBackupUtc`)도 함께 저장한다.
+
+## 백업 (`games.json`)
+
+`games.json`(게임 목록 데이터)을 주기적으로 백업한다. 일간/주간 각각 **파일 하나씩만** 유지한다 (날짜별로 계속 쌓지 않고, 같은 파일에 덮어쓴다).
+
+```
+%LOCALAPPDATA%\GamePlatform\backup\
+├── games.daily.json    # 최근 1일 주기 백업 (덮어씀)
+└── games.weekly.json   # 최근 1주 주기 백업 (덮어씀)
+```
+
+- `settings.json`에 저장해 둔 `LastDailyBackupUtc`/`LastWeeklyBackupUtc`를 기준으로, 마지막 백업 이후 하루/일주일이 지났으면 그 시점의 `games.json`을 각각의 백업 파일로 복사하고 타임스탬프를 갱신한다. 앱 시작 시 한 번, 그리고 `games.json` 저장 시점마다 이 조건을 확인한다 — 앱을 매일 켜지 않아도 다음 실행 시 지난 기간만큼 자동으로 따라잡는다.
+- 복구는 아직 UI로 제공하지 않는다 (필요 시 `%LOCALAPPDATA%\GamePlatform\backup\`의 파일을 `games.json`에 수동으로 덮어쓰는 방식). 향후 "백업에서 복원" 메뉴를 추가할 수 있다.
 
 ## 오류 처리
 
 예외를 catch해 `MessageBox`로 알리고, 프로그램은 종료하지 않고 계속 동작 가능한 상태를 유지한다 (video-vault와 동일한 정책).
 
-- 실행하려는 파일이 존재하지 않는 경우 → 실행 실패 메시지, 카드는 그대로 유지
+- 실행하려는 파일이 존재하지 않는 경우 → [게임 관리](game-management.md)에 따라 애초에 [실행] 버튼이 비활성화되어 있으므로 이 경로로는 발생하지 않는다.
 - 이미지 파일이 손상된 경우 → 기본 아이콘으로 대체 표시
+- **`games.json`이 손상되어 읽을 수 없는 경우 → 빈 목록으로 시작한다.** 위 백업 파일이 있다는 오류 메시지와 함께, 사용자가 원하면 백업에서 수동으로 복구할 수 있음을 안내한다 (자동 복구는 하지 않음 — 손상 원인을 사용자가 먼저 확인할 수 있도록).
 
 ## 확인/결정이 더 필요한 사항
 
-- `games.json`이 손상됐을 때 빈 목록으로 시작할지, 로딩을 막고 사용자가 직접 조치하게 할지.
-- 앱 시작 시 모든 게임의 `ExecutablePath` 존재 여부를 매번 다시 검사할지 (video-vault의 `IsExist` 갱신과 동일한 방식).
+- 앱 시작 시 모든 게임의 `ExecutablePath` 존재 여부를 매번 다시 검사할지, 아니면 캐시된 값을 쓰다가 [실행] 클릭 시점에만 재확인할지 (전자가 기본값에 가깝다 — video-vault의 `IsExist` 갱신과 동일한 방식).
