@@ -8,10 +8,26 @@ namespace GamePlatform;
 public static class AppPaths
 {
     /// <summary>게임 관련 파일의 기본 폴더. 폴더/압축 파일로 게임을 추가할 때(exe 드래그드롭과 달리 원본을
-    /// 그대로 참조할 수 없는 경우) 실제 저장 위치로 쓴다 — doc/game-management.md "게임 추가" 참고.</summary>
-    public static string GamesBaseDir { get; } = @"D:\game";
+    /// 그대로 참조할 수 없는 경우) 실제 저장 위치로 쓴다 — doc/game-management.md "게임 추가" 참고.
+    /// 환경설정("설정 > 환경설정")에서 바꿀 수 있으므로 <see cref="Initialize"/>가 시작 시 <see cref="AppConfig"/>에서
+    /// 불러와 채운다 — 기본값(D:\game)은 그 전까지(또는 설정 로딩에 실패했을 때)의 대체값일 뿐이다.</summary>
+    public static string GamesBaseDir { get; set; } = @"D:\game";
 
-    private static readonly string AppDataDir = Path.Combine(GamesBaseDir, "GamePlatform");
+    /// <summary>압축 명령으로 만든 압축 파일의 저장 위치를 기본값(<see cref="AppDataDir"/>\archives) 대신 다른
+    /// 곳으로 쓰고 싶을 때 지정. null/빈 문자열이면 기본값을 쓴다 — 환경설정에서 관리.</summary>
+    public static string? ArchivesDirOverride { get; set; }
+
+    public static void Initialize(AppConfig config)
+    {
+        if (!string.IsNullOrWhiteSpace(config.GamesBaseDir))
+        {
+            GamesBaseDir = config.GamesBaseDir;
+        }
+
+        ArchivesDirOverride = config.ArchivesDirOverride;
+    }
+
+    private static string AppDataDir => Path.Combine(GamesBaseDir, "GamePlatform");
 
     /// <summary>이 폴더를 D:\game 밑으로 옮기기 전(2026-09-05 이전)에 쓰던 위치. 이미 이 위치에 데이터가
     /// 있으면 <see cref="EnsureAppDataDirectory"/>가 한 번만 새 위치로 옮긴다.</summary>
@@ -38,14 +54,20 @@ public static class AppPaths
     /// <summary>게임 하나의 이미지(대표 썸네일/게임 요약 캡처)를 저장하는 폴더.</summary>
     public static string GameImagesDir(string gameId) => Path.Combine(ImagesDir, gameId);
 
-    private static string ArchivesDir => Path.Combine(AppDataDir, "archives");
+    /// <summary>압축 명령으로 만든 압축 파일을 저장하는 기본 폴더 — <see cref="ArchivesDirOverride"/>가
+    /// 지정되어 있으면 그 경로를, 아니면 <see cref="AppDataDir"/>\archives를 쓴다.</summary>
+    public static string ArchivesDir => string.IsNullOrWhiteSpace(ArchivesDirOverride)
+        ? Path.Combine(AppDataDir, "archives")
+        : ArchivesDirOverride;
 
     /// <summary>게임 하나의 압축 파일을 저장하는 폴더 (게임 Id별로 분리 — 압축 파일 이름 자체는 표시 이름을
     /// 쓰므로, 같은 이름의 게임이 여럿이어도 폴더가 겹치지 않게 하기 위함).</summary>
     private static string GameArchiveDir(string gameId) => Path.Combine(ArchivesDir, gameId);
 
     /// <summary>게임 하나를 통째로 압축한 zip 파일 경로. 파일명은 메인 화면에 보이는 이름(이름-버전)을 그대로
-    /// 쓴다 — doc/game-management.md "게임 압축" 참고.</summary>
+    /// 쓴다 — doc/game-management.md "게임 압축" 참고. 이 경로는 "압축" 명령으로 만드는 압축 파일 전용이며,
+    /// 폴더/압축 파일로 새 게임을 추가할 때는 쓰지 않는다 — 그 경우는 <see cref="ReserveUniquePath"/>로
+    /// <see cref="GamesBaseDir"/> 밑에 직접 둔다(doc/game-management.md "게임 추가" 참고).</summary>
     public static string GameArchivePath(string gameId, string displayName) =>
         Path.Combine(GameArchiveDir(gameId), $"{FileNameHelper.Sanitize(displayName)}.zip");
 
@@ -53,19 +75,44 @@ public static class AppPaths
 
     /// <summary>
     /// 폴더/압축 파일로 게임을 추가할 때 실행 파일이 위치할 폴더를 <see cref="GamesBaseDir"/> 밑에 예약한다.
-    /// 같은 이름의 폴더가 이미 있으면 " (2)", " (3)"... 을 붙여 겹치지 않게 한다. 폴더 자체를 만들지는 않는다
-    /// (실제 압축 해제 시점에 만들어짐).
+    /// 실제로 폴더를 만들지는 않는다 (압축 파일로 추가한 경우 실제 압축 해제 시점에 만들어짐).
     /// </summary>
-    public static string ReserveGameFolder(string displayName)
+    public static string ReserveGameFolder(string displayName) => ReserveUniquePath(FileNameHelper.Sanitize(displayName));
+
+    /// <summary>
+    /// <see cref="GamesBaseDir"/> 밑에서 <paramref name="desiredName"/>과 겹치지 않는 경로를 찾는다 — 폴더든
+    /// 파일이든(확장자 포함) 같은 이름이 이미 있으면 "{이름} (2)", "{이름} (3)"...을 붙인다. 아무 것도 만들지는
+    /// 않고 경로만 계산한다.
+    /// </summary>
+    public static string ReserveUniquePath(string desiredName)
     {
-        var baseName = FileNameHelper.Sanitize(displayName);
-        var candidate = Path.Combine(GamesBaseDir, baseName);
-        for (var suffix = 2; Directory.Exists(candidate) || File.Exists(candidate); suffix++)
+        var candidate = Path.Combine(GamesBaseDir, desiredName);
+        if (!Directory.Exists(candidate) && !File.Exists(candidate))
         {
-            candidate = Path.Combine(GamesBaseDir, $"{baseName} ({suffix})");
+            return candidate;
         }
 
-        return candidate;
+        var nameWithoutExtension = Path.GetFileNameWithoutExtension(desiredName);
+        var extension = Path.GetExtension(desiredName);
+        for (var suffix = 2; ; suffix++)
+        {
+            candidate = Path.Combine(GamesBaseDir, $"{nameWithoutExtension} ({suffix}){extension}");
+            if (!Directory.Exists(candidate) && !File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+    }
+
+    /// <summary>주어진 경로가 이미 <see cref="GamesBaseDir"/> 밑(그 폴더 자신 포함)에 있는지 여부. 게임 추가 시
+    /// 폴더/압축 파일을 옮길지 말지 결정하는 데 쓴다 — 이미 기본 폴더 밑에 있으면(예: 압축 명령이 만든 압축
+    /// 파일도 결국 이 밑이므로) 다시 옮기지 않는다(doc/game-management.md "게임 추가" 참고).</summary>
+    public static bool IsUnderGamesBaseDir(string path)
+    {
+        var full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var baseFull = Path.GetFullPath(GamesBaseDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return full.Equals(baseFull, StringComparison.OrdinalIgnoreCase)
+            || full.StartsWith(baseFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <returns>옛 위치에서 데이터를 옮겼으면 true. 이 경우 호출자는 <see cref="RewriteLegacyPath"/>로
@@ -75,7 +122,9 @@ public static class AppPaths
     {
         if (!Directory.Exists(AppDataDir) && Directory.Exists(LegacyAppDataDir))
         {
-            MigrateLegacyAppDataDirectory();
+            Directory.CreateDirectory(GamesBaseDir);
+            CopyDirectoryRecursive(LegacyAppDataDir, AppDataDir);
+            Directory.Delete(LegacyAppDataDir, recursive: true);
             return true;
         }
 
@@ -83,30 +132,49 @@ public static class AppPaths
         return false;
     }
 
-    /// <summary>옛 위치(%LOCALAPPDATA%\GamePlatform) 기준 절대경로를 새 위치(D:\game\GamePlatform) 기준으로
-    /// 바꾼다. 그 접두사로 시작하지 않는 경로(또는 null/빈 문자열)는 그대로 돌려준다.</summary>
-    public static string? RewriteLegacyPath(string? path)
+    /// <summary>옛 위치(%LOCALAPPDATA%\GamePlatform) 기준 절대경로를 새 위치(현재 <see cref="GamesBaseDir"/>\GamePlatform)
+    /// 기준으로 바꾼다. 그 접두사로 시작하지 않는 경로(또는 null/빈 문자열)는 그대로 돌려준다.</summary>
+    public static string? RewriteLegacyPath(string? path) => RewritePathPrefix(path, LegacyAppDataDir, AppDataDir);
+
+    /// <summary>경로가 <paramref name="oldPrefix"/>로 시작하면 <paramref name="newPrefix"/>로 바꿔치기하고,
+    /// 그렇지 않으면(또는 null/빈 문자열이면) 그대로 돌려준다 — 폴더를 통째로 옮긴 뒤 그 밑을 가리키던
+    /// 절대경로 문자열들을 바로잡는 데 쓴다 (<see cref="RewriteLegacyPath"/>, `MainWindow.RewriteGamePathsPrefix` 참고).</summary>
+    public static string? RewritePathPrefix(string? path, string oldPrefix, string newPrefix)
     {
-        if (string.IsNullOrEmpty(path) || !path.StartsWith(LegacyAppDataDir, StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrEmpty(path) || !path.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase))
         {
             return path;
         }
 
-        return AppDataDir + path[LegacyAppDataDir.Length..];
+        return newPrefix + path[oldPrefix.Length..];
     }
 
     /// <summary>
-    /// 옛 위치(보통 C:\의 %LOCALAPPDATA%)에서 새 위치(D:\game\GamePlatform)로 데이터를 옮긴다.
-    /// <see cref="Directory.Move"/>는 서로 다른 드라이브 사이에서는 동작하지 않으므로("Move will not work
-    /// across volumes" — 실제로 겪은 오류), 전체를 복사한 뒤 원본을 지우는 방식으로 직접 구현했다.
+    /// 환경설정에서 "기본 폴더"를 바꿨을 때, 이 앱의 관리 데이터 폴더(games.json/settings.json/images/archives/backup)
+    /// 를 옛 기본 폴더 밑에서 새 기본 폴더 밑으로 옮긴다. 사용자의 실제 게임 폴더/파일은 옮기지 않는다 — 그건
+    /// 여기서 다루는 범위 밖이며, 이미 <see cref="GamesBaseDir"/> 자체가 새 값으로 바뀌므로 앞으로 추가하는
+    /// 게임부터 새 위치를 쓰게 된다.
     /// </summary>
-    private static void MigrateLegacyAppDataDirectory()
+    public static void MigrateAppDataDir(string oldGamesBaseDir, string newGamesBaseDir)
     {
-        Directory.CreateDirectory(GamesBaseDir);
-        CopyDirectoryRecursive(LegacyAppDataDir, AppDataDir);
-        Directory.Delete(LegacyAppDataDir, recursive: true);
+        var oldAppDataDir = Path.Combine(oldGamesBaseDir, "GamePlatform");
+        var newAppDataDir = Path.Combine(newGamesBaseDir, "GamePlatform");
+
+        if (!Directory.Exists(oldAppDataDir) ||
+            string.Equals(Path.GetFullPath(oldAppDataDir), Path.GetFullPath(newAppDataDir), StringComparison.OrdinalIgnoreCase))
+        {
+            Directory.CreateDirectory(newAppDataDir);
+            return;
+        }
+
+        Directory.CreateDirectory(newGamesBaseDir);
+        CopyDirectoryRecursive(oldAppDataDir, newAppDataDir);
+        Directory.Delete(oldAppDataDir, recursive: true);
     }
 
+    /// <summary><see cref="Directory.Move"/>는 서로 다른 드라이브 사이에서는 동작하지 않으므로("Move will not
+    /// work across volumes" — 실제로 겪은 오류), 폴더를 옮겨야 할 때는 항상 이 헬퍼로 전체를 복사한 뒤
+    /// 원본을 지우는 방식을 쓴다.</summary>
     private static void CopyDirectoryRecursive(string sourceDir, string destDir)
     {
         Directory.CreateDirectory(destDir);

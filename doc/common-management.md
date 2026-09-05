@@ -2,7 +2,7 @@
 
 > [메인 지시서](../CLAUDE.md)의 하위 문서. 특정 게임 항목에 속하지 않고 앱 전체에 적용되는 것들 — 저장 경로, 설정, 썸네일/드래그앤드롭 공용 인프라, 오류 처리 — 을 모은다. 게임 카드/실행/정보 창 자체는 [게임 관리](game-management.md) 참고.
 
-**관련 파일**: `App.xaml`/`.xaml.cs`, `AppPaths.cs`, `AppSettings.cs`, `SettingsRepository.cs`, `ImageLoadHelper.cs`, `ThumbnailPathConverter.cs`, `ThumbnailHelper.cs`, `DragDropImageHelper.cs`, `OriginalImageWindow.xaml`/`.xaml.cs`, `SingleInstanceWindow.cs`, `WindowPositionMemory.cs`, `WindowSizeMemory.cs`, `BackupService.cs`, `FileNameHelper.cs`, `SelectExecutableWindow.xaml`/`.xaml.cs`
+**관련 파일**: `App.xaml`/`.xaml.cs`, `AppPaths.cs`, `AppConfig.cs`, `AppConfigRepository.cs`, `AppSettings.cs`, `SettingsRepository.cs`, `ImageLoadHelper.cs`, `ThumbnailPathConverter.cs`, `ThumbnailHelper.cs`, `DragDropImageHelper.cs`, `OriginalImageWindow.xaml`/`.xaml.cs`, `SingleInstanceWindow.cs`, `WindowPositionMemory.cs`, `WindowSizeMemory.cs`, `BackupService.cs`, `FileNameHelper.cs`, `SelectExecutableWindow.xaml`/`.xaml.cs`, `PreferencesWindow.xaml`/`.xaml.cs`
 
 ## video-vault에서 이식하는 인프라
 
@@ -17,7 +17,7 @@
 
 ## 저장 위치
 
-**게임 관련 파일의 기본 폴더는 `D:\game`이다** (`AppPaths.GamesBaseDir`, 2026-09-05 확정 — 사용자 요청). 이 앱의 관리 데이터도 그 밑의 `GamePlatform` 폴더에 둔다(video-vault의 `%LOCALAPPDATA%\VideoVault\` 패턴 대신, 게임 관련 파일과 한 드라이브·한 폴더 밑에 모아두기 위함).
+**게임 관련 파일의 기본 폴더는 `D:\game`이다** (`AppPaths.GamesBaseDir`, 기본값 2026-09-05 확정 — 사용자 요청). 이 앱의 관리 데이터도 그 밑의 `GamePlatform` 폴더에 둔다(video-vault의 `%LOCALAPPDATA%\VideoVault\` 패턴 대신, 게임 관련 파일과 한 드라이브·한 폴더 밑에 모아두기 위함). **"설정 > 환경설정"으로 바꿀 수 있다** — 아래 "환경설정" 절 참고.
 
 ```
 D:\game\
@@ -48,6 +48,24 @@ D:\game\GamePlatform\
 
 1. 새 위치(`D:\game\GamePlatform\`)가 없고 옛 위치가 있으면, 옛 폴더 전체를 새 위치로 복사한 뒤 옛 폴더를 지운다. `Directory.Move`는 드라이브가 다르면("C:\ → D:\") 동작하지 않아서("Move will not work across volumes" — 실제로 겪은 오류) 직접 복사+삭제로 구현했다.
 2. **파일을 옮기는 것과 `games.json`에 저장된 절대경로 문자열(`ThumbnailPath`/`Screenshots[].Path`/`ArchivePath`)을 바로잡는 것은 별개다** — 1번은 디스크상의 실제 파일 위치만 바꿀 뿐, 이미 로드된 JSON의 경로 문자열까지 자동으로 바뀌지는 않는다. `MainWindow`가 게임 목록을 불러온 직후 `RewriteLegacyImagePaths()`로 옛 접두사(`%LOCALAPPDATA%\GamePlatform\`)로 시작하는 경로를 전부 새 접두사로 바꿔 다시 저장한다. 이 검사는 옛 경로가 하나도 없으면 아무 것도 하지 않는 가벼운 스캔이라, 마이그레이션이 이번 실행에서 일어났는지 여부와 무관하게 **매번** 실행한다 — 파일 이동과 경로 교정이 서로 다른 실행에서 일어나는 경우(예: 이동만 되고 교정 전에 껐다 켠 경우)에도 안전하게 만회하기 위함이다.
+
+## 환경설정 (메뉴 "설정")
+
+메인 창 메뉴("설정 > 환경설정...")로 여는 `PreferencesWindow`에서 아래 두 값을 편집한다(2026-09-06 추가, 사용자 요청):
+
+- **기본 폴더** (`AppPaths.GamesBaseDir`)
+- **압축 명령으로 압축된 파일 위치** (`AppPaths.ArchivesDirOverride`) — 비워두면 기본값(`{기본 폴더}\GamePlatform\archives`)을 쓴다. [게임 관리](game-management.md)의 "게임 압축"(카드 우클릭 메뉴)이 만드는 압축 파일만 여기 영향을 받는다 — "게임 추가"로 등록하는 압축 파일은 항상 기본 폴더에 바로 놓인다(위 "저장 위치" 참고).
+
+### 왜 이 둘은 `settings.json`이 아니라 별도 파일(`config.json`)에 저장하는지
+
+`settings.json`은 `{기본 폴더}\GamePlatform\settings.json`에 있다 — 즉 "기본 폴더가 어디인지"를 알아야 그 파일을 찾을 수 있다. 그런데 기본 폴더 자체를 `settings.json` 안에 저장해버리면, 앱을 다시 켰을 때 그 값을 읽으려고 `settings.json`을 열어야 하는데 그러려면 이미 기본 폴더를 알고 있어야 하는 닭-달걀 문제가 생긴다. 그래서 `AppConfig`(`GamesBaseDir`, `ArchivesDirOverride`)는 항상 고정된 위치(`%LOCALAPPDATA%\GamePlatform\config.json` — 절대 옮겨지지 않는 위치)에 별도로 저장한다(`AppConfigRepository`). `MainWindow`는 시작하자마자 제일 먼저(`AppPaths.EnsureAppDataDirectory`보다도 먼저) 이 설정을 읽어(`AppPaths.Initialize`) `AppPaths.GamesBaseDir`를 채운 뒤에야 나머지(games.json 위치 등)를 계산한다.
+
+### 기본 폴더를 바꾸면 일어나는 일
+
+1. **확인 대화상자**를 거친 뒤, 이 앱의 관리 데이터 폴더(`{옛 기본 폴더}\GamePlatform\`) 전체를 새 기본 폴더 밑으로 옮긴다(`AppPaths.MigrateAppDataDir` — 옛 위치 자동 이동과 같은 복사+삭제 방식, 드라이브가 달라도 안전하다).
+2. **게임 목록에 이미 저장된 절대경로도 함께 바로잡는다** — `MainWindow.RewriteGamePathsPrefix`가 옛 관리 데이터 폴더로 시작하는 `ThumbnailPath`/`Screenshots[].Path`/`ArchivePath`를 새 경로로 바꿔 다시 저장한다(위 옛 위치 자동 이동과 같은 종류의 문제: 파일은 옮겼는데 JSON 속 문자열은 안 바뀌는 것을 막기 위함). 이 창(`PreferencesWindow`)은 게임 목록을 모르므로, 이 단계는 `MainWindow.OpenPreferences_Click`이 대화상자가 닫힌 뒤 처리한다.
+3. **사용자의 실제 게임 폴더/압축 파일 자체는 옮기지 않는다** — 이미 다른 곳(예: 옛 기본 폴더 자리)에 있는 게임들은 그 자리에 그대로 남고, `ExecutablePath`/`ArchivePath`(기본 폴더 바깥을 가리키는 것들)도 그대로 유효하다. 앞으로 새로 추가하는 게임부터 새 기본 폴더를 쓴다.
+- **압축 위치**를 바꾸는 것은 앞으로의 압축 명령에만 영향을 준다 — 이미 만들어진 압축 파일은 옮기지 않는다(각 게임의 `ArchivePath`가 이미 절대경로로 저장되어 있어 계속 유효하다).
 
 ## 설정 관리 (`settings.json`)
 

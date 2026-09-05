@@ -28,6 +28,9 @@
                     <MenuItem x:Name="SmallSizeMenuItem" Header="160x120" IsCheckable="True" Click="SmallSizeMenuItem_Click"/>
                 </MenuItem>
             </MenuItem>
+            <MenuItem Header="설정(_S)">
+                <MenuItem Header="환경설정..." Click="OpenPreferences_Click"/>
+            </MenuItem>
         </Menu>
         <!-- 상태바(video-vault의 SeriesManagerWindow 패턴) — 게임 추가/삭제/썸네일 지정/압축 등 각종 이벤트를
              대화상자 대신 여기 표시한다. 종류(성공/경고/정보/오류)에 따라 아이콘과 글자색이 SetStatus에서 정해진다. -->

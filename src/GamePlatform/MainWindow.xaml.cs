@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        AppPaths.Initialize(AppConfigRepository.Load());
         var didMigrateAppData = AppPaths.EnsureAppDataDirectory();
         _currentGamesPath = AppPaths.GamesPath;
 
@@ -136,6 +137,77 @@ public partial class MainWindow : Window
         {
             GameLibraryRepository.Save(_games, _currentGamesPath);
         }
+    }
+
+    /// <summary>환경설정에서 "기본 폴더"를 바꿔 관리 데이터 폴더가 물리적으로 옮겨진 뒤, 게임 목록에 저장된
+    /// 절대경로(ThumbnailPath/Screenshots/ArchivePath)도 같은 접두사 교체로 바로잡는다 — <see cref="RewriteLegacyImagePaths"/>와
+    /// 같은 문제(파일은 옮겼는데 JSON 속 경로 문자열은 그대로인 것)를 임의의 (옛 경로, 새 경로) 쌍에 대해 처리하는 일반화 버전이다.</summary>
+    private void RewriteGamePathsPrefix(string oldPrefix, string newPrefix)
+    {
+        var changed = false;
+
+        foreach (var game in _games)
+        {
+            var newThumbnail = AppPaths.RewritePathPrefix(game.ThumbnailPath, oldPrefix, newPrefix);
+            if (newThumbnail != game.ThumbnailPath)
+            {
+                game.ThumbnailPath = newThumbnail;
+                changed = true;
+            }
+
+            var newArchive = AppPaths.RewritePathPrefix(game.ArchivePath, oldPrefix, newPrefix);
+            if (newArchive != game.ArchivePath)
+            {
+                game.ArchivePath = newArchive;
+                changed = true;
+            }
+
+            foreach (var screenshot in game.Screenshots)
+            {
+                var newPath = AppPaths.RewritePathPrefix(screenshot.Path, oldPrefix, newPrefix) ?? screenshot.Path;
+                if (newPath != screenshot.Path)
+                {
+                    screenshot.Path = newPath;
+                    changed = true;
+                }
+            }
+        }
+
+        if (changed)
+        {
+            GameLibraryRepository.Save(_games, _currentGamesPath);
+        }
+    }
+
+    /// <summary>"설정 &gt; 환경설정" — 기본 폴더/압축 위치를 편집한다. 실제 편집·마이그레이션은
+    /// <see cref="PreferencesWindow"/>가 처리하고, 여기서는 그 결과로 게임 목록의 경로들을 바로잡는다
+    /// (이 창은 게임 목록을 모르므로 그 부분은 호출자 몫이다).</summary>
+    private void OpenPreferences_Click(object sender, RoutedEventArgs e)
+    {
+        var oldGamesBaseDir = AppPaths.GamesBaseDir;
+        var oldAppDataDir = Path.Combine(oldGamesBaseDir, "GamePlatform");
+        var oldGamesPath = AppPaths.GamesPath;
+
+        var dialog = new PreferencesWindow { Owner = this };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        if (!string.Equals(Path.GetFullPath(oldGamesBaseDir), Path.GetFullPath(AppPaths.GamesBaseDir), StringComparison.OrdinalIgnoreCase))
+        {
+            var newAppDataDir = Path.Combine(AppPaths.GamesBaseDir, "GamePlatform");
+            RewriteGamePathsPrefix(oldAppDataDir, newAppDataDir);
+
+            // 이 세션이 기본 위치의 게임 목록 파일을 보고 있었다면(파일 메뉴로 다른 파일을 열어두지 않았다면)
+            // 새 위치로 계속 따라가게 한다.
+            if (_currentGamesPath.Equals(oldGamesPath, StringComparison.OrdinalIgnoreCase))
+            {
+                _currentGamesPath = AppPaths.GamesPath;
+            }
+        }
+
+        SetStatus("환경설정을 저장했습니다.", StatusType.Success);
     }
 
     private void ApplyWindowBounds()
@@ -264,14 +336,19 @@ public partial class MainWindow : Window
         StatusText.Foreground = brush;
     }
 
-    private void ShowCompressProgress(string label)
+    private void ShowCompressProgress(string label, bool indeterminate = false)
     {
         CompressProgressPanel.Visibility = Visibility.Visible;
         CompressProgressLabel.Text = label;
+        CompressProgressBar.IsIndeterminate = indeterminate;
         CompressProgressBar.Value = 0;
     }
 
-    private void HideCompressProgress() => CompressProgressPanel.Visibility = Visibility.Collapsed;
+    private void HideCompressProgress()
+    {
+        CompressProgressPanel.Visibility = Visibility.Collapsed;
+        CompressProgressBar.IsIndeterminate = false;
+    }
 
     #endregion
 
@@ -294,7 +371,7 @@ public partial class MainWindow : Window
         {
             if (Directory.Exists(path))
             {
-                AddGameFromFolder(path);
+                _ = AddGameFromFolderAsync(path);
             }
             else if (string.Equals(Path.GetExtension(path), ".exe", StringComparison.OrdinalIgnoreCase))
             {
@@ -302,7 +379,7 @@ public partial class MainWindow : Window
             }
             else if (string.Equals(Path.GetExtension(path), ".zip", StringComparison.OrdinalIgnoreCase))
             {
-                AddGameFromArchive(path);
+                _ = AddGameFromArchiveAsync(path);
             }
         }
     }
@@ -320,9 +397,10 @@ public partial class MainWindow : Window
         SetStatus($"'{item.DisplayName}' 게임을 추가했습니다.", StatusType.Success);
     }
 
-    /// <summary>폴더로 게임을 추가한다 — exe 드래그드롭과 달리 폴더는 옮기거나 복사하지 않고, 그 안에서 찾은
-    /// 실행 파일의 경로만 그대로 참조한다 (doc/game-management.md "게임 추가" 참고).</summary>
-    private void AddGameFromFolder(string folderPath)
+    /// <summary>폴더로 게임을 추가한다. 이미 <see cref="AppPaths.GamesBaseDir"/>(D:\game) 밑에 있는 폴더면
+    /// 그 자리를 그대로 쓰고, 그 바깥에 있으면 게임 등록과 함께 그 밑으로 옮긴다(doc/game-management.md
+    /// "게임 추가" 참고, 사용자 요청) — 백그라운드 스레드에서 진행하며 상태바에 진행률을 보여준다.</summary>
+    private async Task AddGameFromFolderAsync(string folderPath)
     {
         List<string> relativePaths;
         try
@@ -349,10 +427,50 @@ public partial class MainWindow : Window
             return;
         }
 
+        var folderName = Path.GetFileName(folderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        var targetFolderPath = folderPath;
+
+        if (!AppPaths.IsUnderGamesBaseDir(folderPath))
+        {
+            var destFolder = AppPaths.ReserveUniquePath(FileNameHelper.Sanitize(folderName));
+            ShowCompressProgress($"'{folderName}' 폴더를 '{AppPaths.GamesBaseDir}'(으)로 옮기는 중...");
+            SetStatus($"'{folderName}' 폴더를 '{AppPaths.GamesBaseDir}'(으)로 옮기는 중입니다...", StatusType.Info);
+
+            try
+            {
+                var progress = new Progress<int>(percent => CompressProgressBar.Value = percent);
+                await Task.Run(() => CopyDirectoryContents(folderPath, destFolder, progress));
+            }
+            catch (Exception ex)
+            {
+                try { if (Directory.Exists(destFolder)) Directory.Delete(destFolder, recursive: true); } catch { /* 미완성 복사본 정리 시도, 실패해도 무시 */ }
+                SetStatus($"'{folderName}' 폴더를 옮기지 못했습니다: {ex.Message}", StatusType.Error);
+                HideCompressProgress();
+                return;
+            }
+
+            targetFolderPath = destFolder;
+
+            // 복사는 이미 끝났다 — 원본 삭제가 실패해도(파일 잠금 등) 게임은 새 위치 기준으로 등록한다
+            // (게임 압축과 같은 원칙: 핵심 작업 성공과 뒷정리 실패를 분리한다).
+            try
+            {
+                await Task.Run(() => RetryDelete(() => Directory.Delete(folderPath, recursive: true)));
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"'{folderName}' 폴더를 옮겼지만 원본을 지우지 못했습니다({ex.Message}) — 나중에 수동으로 지워도 됩니다.", StatusType.Warning);
+            }
+            finally
+            {
+                HideCompressProgress();
+            }
+        }
+
         var item = new GameItem
         {
-            Name = Path.GetFileName(folderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
-            ExecutablePath = Path.Combine(folderPath, chosen),
+            Name = Path.GetFileName(targetFolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
+            ExecutablePath = Path.Combine(targetFolderPath, chosen),
         };
         item.RefreshExecutableValid();
         _games.Add(item);
@@ -362,8 +480,10 @@ public partial class MainWindow : Window
 
     /// <summary>압축 파일(zip)로 게임을 추가한다 — 압축을 그 자리에서 풀지 않고, zip 자체를 이 게임의 압축
     /// 파일로 등록한다(압축된 상태로 시작). 실제 압축 해제는 사용자가 카드의 [압축 풀기]를 눌렀을 때
-    /// <see cref="AppPaths.GamesBaseDir"/> 밑에 예약해둔 폴더에서 이루어진다 (doc/game-management.md 참고).</summary>
-    private void AddGameFromArchive(string zipPath)
+    /// <see cref="AppPaths.GamesBaseDir"/> 밑에 예약해둔 폴더에서 이루어진다. 압축 파일 자체도 이미
+    /// <see cref="AppPaths.GamesBaseDir"/> 밑에 있지 않으면(압축 명령이 만든, 이미 관리 중인 압축 파일이
+    /// 아니면) 그 밑으로 옮긴다(doc/game-management.md "게임 추가" 참고, 사용자 요청).</summary>
+    private async Task AddGameFromArchiveAsync(string zipPath)
     {
         List<string> relativePaths;
         try
@@ -395,12 +515,30 @@ public partial class MainWindow : Window
         var gameFolder = AppPaths.ReserveGameFolder(item.DisplayName);
         item.ExecutablePath = Path.Combine(gameFolder, chosen);
 
+        var archivePath = zipPath;
+        if (!AppPaths.IsUnderGamesBaseDir(zipPath))
+        {
+            archivePath = AppPaths.ReserveUniquePath(Path.GetFileName(zipPath));
+            var zipName = Path.GetFileName(zipPath);
+            ShowCompressProgress($"'{zipName}'을(를) '{AppPaths.GamesBaseDir}'(으)로 옮기는 중...", indeterminate: true);
+            SetStatus($"'{zipName}'을(를) '{AppPaths.GamesBaseDir}'(으)로 옮기는 중입니다...", StatusType.Info);
+
+            try
+            {
+                await Task.Run(() => File.Move(zipPath, archivePath));
+            }
+            catch (Exception ex)
+            {
+                HideCompressProgress();
+                MessageBox.Show(this, $"압축 파일을 옮기지 못했습니다.\n{ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            HideCompressProgress();
+        }
+
         try
         {
-            AppPaths.EnsureArchiveDirectory(item.Id);
-            var archivePath = AppPaths.GameArchivePath(item.Id, item.DisplayName);
-            File.Move(zipPath, archivePath);
-
             item.ArchivePath = archivePath;
             item.ArchiveSizeBytes = new FileInfo(archivePath).Length;
             item.CompressedAtUtc = DateTime.UtcNow;
@@ -813,6 +951,30 @@ public partial class MainWindow : Window
 
         if (files.Length == 0)
         {
+            progress.Report(100);
+        }
+    }
+
+    /// <summary>폴더를 다른 폴더로 통째로 복사하며 진행률(전체 파일 수 대비 처리한 파일 수)을 보고한다 —
+    /// <see cref="Directory.Move"/>는 드라이브가 다르면 동작하지 않으므로, 게임 추가 시 폴더를
+    /// <see cref="AppPaths.GamesBaseDir"/> 밑으로 옮길 때 복사+원본 삭제 방식으로 쓴다. 백그라운드
+    /// 스레드에서 호출된다.</summary>
+    private static void CopyDirectoryContents(string sourceDir, string destDir, IProgress<int> progress)
+    {
+        var files = Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories);
+
+        for (var i = 0; i < files.Length; i++)
+        {
+            var relative = Path.GetRelativePath(sourceDir, files[i]);
+            var destPath = Path.Combine(destDir, relative);
+            Directory.CreateDirectory(Path.GetDirectoryName(destPath)!);
+            File.Copy(files[i], destPath, overwrite: true);
+            progress.Report((i + 1) * 100 / files.Length);
+        }
+
+        if (files.Length == 0)
+        {
+            Directory.CreateDirectory(destDir);
             progress.Report(100);
         }
     }

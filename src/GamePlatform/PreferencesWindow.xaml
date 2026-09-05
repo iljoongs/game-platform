@@ -1,0 +1,34 @@
+<Window x:Class="GamePlatform.PreferencesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="환경설정" Height="260" Width="520"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="확인" Width="80" Margin="0,0,8,0" Click="Ok_Click" IsDefault="True"/>
+            <Button Content="취소" Width="80" Click="Cancel_Click" IsCancel="True"/>
+        </StackPanel>
+
+        <StackPanel>
+            <TextBlock Text="기본 폴더" FontWeight="Bold"/>
+            <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,2,0,4"
+                       Text="폴더/압축 파일로 게임을 추가할 때 실제로 저장되는 위치입니다. 바꾸면 이 앱의 관리 데이터(게임 목록, 썸네일 등)도 새 위치로 옮겨지지만, 이미 다른 곳에 있는 게임 폴더/파일까지 옮기지는 않습니다."/>
+            <DockPanel Margin="0,0,0,16">
+                <Button Content="찾아보기" DockPanel.Dock="Right" Margin="4,0,0,0" Click="BrowseGamesBaseDir_Click"/>
+                <TextBox x:Name="GamesBaseDirTextBox"/>
+            </DockPanel>
+
+            <TextBlock Text="압축 명령으로 압축된 파일 위치" FontWeight="Bold"/>
+            <TextBlock TextWrapping="Wrap" Foreground="Gray" Margin="0,2,0,4"
+                       Text="카드 우클릭 메뉴 '압축'으로 만드는 압축 파일의 저장 위치입니다. 비워두면 기본값(기본 폴더\GamePlatform\archives)을 씁니다. 바꿔도 이미 만들어진 압축 파일은 옮기지 않습니다."/>
+            <DockPanel>
+                <Button Content="찾아보기" DockPanel.Dock="Right" Margin="4,0,0,0" Click="BrowseArchivesDir_Click"/>
+                <TextBox x:Name="ArchivesDirTextBox"/>
+            </DockPanel>
+        </StackPanel>
+    </DockPanel>
+</Window>
