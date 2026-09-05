@@ -468,13 +468,37 @@ public partial class MainWindow : Window
         try
         {
             var destDir = AppPaths.GameImagesDir(item.Id);
-            item.ThumbnailPath = ThumbnailHelper.CopyOriginal(sourceImagePath, destDir, "cover", deleteSource);
+            DeleteExistingCoverFiles(destDir);
+            var newPath = ThumbnailHelper.CopyOriginal(sourceImagePath, destDir, "cover", deleteSource);
+
+            // CopyOriginal은 항상 "cover.original.{확장자}"에 저장하므로, 새로 드롭한 이미지가 이전 것과
+            // 확장자가 같으면 경로 문자열 자체는 그대로다. GameItem.ThumbnailPath의 setter는 값이 실제로
+            // 바뀔 때만 PropertyChanged를 올리므로, 그냥 대입하면 파일은 새로 덮어써졌는데 카드 이미지는
+            // 갱신되지 않는다(실제로 겪은 버그) — null로 한 번 지웠다가 다시 지정해서 항상 알림이 나가게 한다.
+            item.ThumbnailPath = null;
+            item.ThumbnailPath = newPath;
+
             SaveState();
             SetStatus($"'{item.DisplayName}'의 대표 썸네일을 지정했습니다.", StatusType.Success);
         }
         catch (Exception ex)
         {
             SetStatus($"썸네일을 지정하지 못했습니다: {ex.Message}", StatusType.Error);
+        }
+    }
+
+    /// <summary>새 대표 썸네일을 저장하기 전에 기존 "cover.original.*" 파일을 지운다 — 새 이미지의
+    /// 확장자가 이전과 다르면(예: png → jpg) 옛 파일이 정리되지 않고 고아로 남는 것을 막는다.</summary>
+    private static void DeleteExistingCoverFiles(string destDir)
+    {
+        if (!Directory.Exists(destDir))
+        {
+            return;
+        }
+
+        foreach (var file in Directory.GetFiles(destDir, "cover.original.*"))
+        {
+            try { File.Delete(file); } catch { /* 새 썸네일 저장에는 지장 없으므로 무시 */ }
         }
     }
 
