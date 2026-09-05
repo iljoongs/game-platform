@@ -23,7 +23,7 @@ game-platform/
 ├── .gitignore
 ├── doc/               # 기능별 상세 보조 지시서 (게임 목록/썸네일/설정 데이터는 %LOCALAPPDATA%\GamePlatform\ 사용 — doc/common-management.md 참고)
 └── src/
-    └── GamePlatform/  # 앱 본체 소스 (아직 미구현)
+    └── GamePlatform/  # 앱 본체 소스 (.NET 8 WPF)
 ```
 
 ## 보조 지시서 목록 (doc/ 폴더)
