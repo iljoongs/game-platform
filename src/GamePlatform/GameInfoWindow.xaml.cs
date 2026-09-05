@@ -135,7 +135,7 @@ public partial class GameInfoWindow : Window
 
     private void ScreenshotArea_Drop(object sender, DragEventArgs e)
     {
-        var imagePath = DragDropImageHelper.TryGetImagePath(e.Data);
+        var imagePath = DragDropImageHelper.TryGetImagePath(e.Data, out var isTemporary);
         if (imagePath is null)
         {
             e.Handled = true;
@@ -146,7 +146,7 @@ public partial class GameInfoWindow : Window
         {
             var destDir = AppPaths.GameImagesDir(_item.Id);
             var baseName = $"screenshot-{Guid.NewGuid():N}";
-            var result = ThumbnailHelper.CreateThumbnail(imagePath, destDir, baseName);
+            var result = ThumbnailHelper.CreateThumbnail(imagePath, destDir, baseName, isTemporary);
             _item.Screenshots.Add(new ScreenshotItem { Path = result.ThumbnailPath, OriginalPath = result.OriginalPath });
             RefreshGallery();
             _onChanged();

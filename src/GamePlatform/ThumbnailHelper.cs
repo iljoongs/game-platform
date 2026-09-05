@@ -21,11 +21,13 @@ public static class ThumbnailHelper
     /// <summary>
     /// <paramref name="sourceImagePath"/> 이미지를
     /// (1) 원본 그대로 <paramref name="destDir"/>에 "{baseName}.original{확장자}"로 복사하고,
-    /// (2) 가로세로 비율을 유지한 채 320x240 이내로 리사이즈해 같은 폴더에 "{baseName}.thumbnail.jpg"로 저장한 뒤,
-    /// (3) 두 파일로의 복사가 끝난 <paramref name="sourceImagePath"/> 원본은 삭제한다
-    /// (드래그 앤 드롭/다운로드로 만들어진 임시 파일이 남지 않도록 하기 위함이기도 하다).
+    /// (2) 가로세로 비율을 유지한 채 320x240 이내로 리사이즈해 같은 폴더에 "{baseName}.thumbnail.jpg"로 저장한다.
     /// </summary>
-    public static Result CreateThumbnail(string sourceImagePath, string destDir, string baseName)
+    /// <param name="deleteSource">true면 두 파일로의 복사가 끝난 <paramref name="sourceImagePath"/>를 삭제한다 —
+    /// 드래그 앤 드롭/다운로드로 만들어진 임시 파일 정리용으로만 true를 넘겨야 한다. 사용자의 로컬 파일을
+    /// 그대로 드래그한 경우(<see cref="DragDropImageHelper.TryGetImagePath"/>의 <c>isTemporary</c>가 false)는
+    /// 반드시 false로 호출해 원본을 건드리지 않는다.</param>
+    public static Result CreateThumbnail(string sourceImagePath, string destDir, string baseName, bool deleteSource)
     {
         Directory.CreateDirectory(destDir);
 
@@ -61,7 +63,7 @@ public static class ThumbnailHelper
         }
 
         var isSourceSameAsThumbnail = string.Equals(sourceFullPath, Path.GetFullPath(thumbnailPath), StringComparison.OrdinalIgnoreCase);
-        if (!isSourceSameAsOriginal && !isSourceSameAsThumbnail)
+        if (deleteSource && !isSourceSameAsOriginal && !isSourceSameAsThumbnail)
         {
             TryDeleteSource(sourceImagePath);
         }
@@ -71,12 +73,14 @@ public static class ThumbnailHelper
 
     /// <summary>
     /// <paramref name="sourceImagePath"/> 이미지를 리사이즈 없이 원본 크기 그대로 <paramref name="destDir"/>에
-    /// "{baseName}.original{확장자}"로 복사하고, 복사가 끝난 원본은 삭제한다. 메인 화면 카드 대표 썸네일은
-    /// 별도의 리사이즈본을 만들지 않고 이 원본 크기 파일을 그대로 저장해뒀다가 화면에는 스케일해서 보여준다
-    /// (doc/game-management.md "대표 썸네일 지정" 참고) — 여러 장을 반복해서 작게 표시해야 하는 게임 요약
-    /// 갤러리(<see cref="CreateThumbnail"/>)와 달리, 카드 하나당 한 장뿐이라 리사이즈본을 따로 둘 이유가 없다.
+    /// "{baseName}.original{확장자}"로 복사한다. 메인 화면 카드 대표 썸네일은 별도의 리사이즈본을 만들지 않고
+    /// 이 원본 크기 파일을 그대로 저장해뒀다가 화면에는 스케일해서 보여준다(doc/game-management.md "대표 썸네일
+    /// 지정" 참고) — 여러 장을 반복해서 작게 표시해야 하는 게임 요약 갤러리(<see cref="CreateThumbnail"/>)와
+    /// 달리, 카드 하나당 한 장뿐이라 리사이즈본을 따로 둘 이유가 없다.
     /// </summary>
-    public static string CopyOriginal(string sourceImagePath, string destDir, string baseName)
+    /// <param name="deleteSource">true면 복사가 끝난 <paramref name="sourceImagePath"/>를 삭제한다 — <see cref="CreateThumbnail"/>의
+    /// 동명 매개변수와 같은 규칙: 임시 파일에만 true를 넘기고, 사용자의 로컬 파일은 false로 남겨둔다.</param>
+    public static string CopyOriginal(string sourceImagePath, string destDir, string baseName, bool deleteSource)
     {
         Directory.CreateDirectory(destDir);
 
@@ -93,7 +97,10 @@ public static class ThumbnailHelper
         if (!isSourceSameAsDest)
         {
             File.Copy(sourceImagePath, destPath, overwrite: true);
-            TryDeleteSource(sourceImagePath);
+            if (deleteSource)
+            {
+                TryDeleteSource(sourceImagePath);
+            }
         }
 
         return destPath;

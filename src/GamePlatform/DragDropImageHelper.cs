@@ -36,8 +36,13 @@ public static class DragDropImageHelper
     /// 로컬 파일이면 그 경로를 그대로, 웹 URL/data: URI/비트맵이면 임시 파일로 저장한 경로를 반환한다.
     /// 이미지를 찾을 수 없거나 어떤 이유로든 실패하면 null (예외를 던지지 않는다 — OLE 드래그 앤 드롭 콜백 안이라 안전을 위해).
     /// </summary>
-    public static string? TryGetImagePath(IDataObject data)
+    /// <param name="isTemporary">반환된 경로가 이 메서드가 직접 만든 임시 파일(웹 다운로드/data: URI/렌더링된
+    /// 비트맵)이면 true, 사용자의 로컬 파일 그대로면 false. 호출자가 사용이 끝난 뒤 파일을 지워도 되는지
+    /// 판단하는 데 쓴다 — 로컬 파일(false)은 사용자 소유이므로 절대 지우면 안 된다.</param>
+    public static string? TryGetImagePath(IDataObject data, out bool isTemporary)
     {
+        isTemporary = false;
+
         try
         {
             if (data.GetDataPresent(DataFormats.FileDrop) &&
@@ -51,12 +56,14 @@ public static class DragDropImageHelper
                 var resolved = ResolveCandidate(candidate);
                 if (resolved is not null)
                 {
+                    isTemporary = true;
                     return resolved;
                 }
             }
 
             if (data.GetDataPresent(DataFormats.Bitmap) && data.GetData(DataFormats.Bitmap) is BitmapSource bitmap)
             {
+                isTemporary = true;
                 return SaveBitmapToTempFile(bitmap);
             }
         }

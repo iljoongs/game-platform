@@ -136,13 +136,13 @@ public partial class MainWindow : Window
             return; // 처리하지 않고 상위(Window)로 넘어가도록 Handled를 세우지 않는다.
         }
 
-        var imagePath = DragDropImageHelper.TryGetImagePath(e.Data);
+        var imagePath = DragDropImageHelper.TryGetImagePath(e.Data, out var isTemporary);
         if (imagePath is null)
         {
             return;
         }
 
-        ApplyThumbnail(item, imagePath);
+        ApplyThumbnail(item, imagePath, isTemporary);
         e.Handled = true;
     }
 
@@ -151,12 +151,12 @@ public partial class MainWindow : Window
         data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } files &&
         !ImageExtensions.Contains(Path.GetExtension(files[0]).ToLowerInvariant());
 
-    private void ApplyThumbnail(GameItem item, string sourceImagePath)
+    private void ApplyThumbnail(GameItem item, string sourceImagePath, bool deleteSource)
     {
         try
         {
             var destDir = AppPaths.GameImagesDir(item.Id);
-            item.ThumbnailPath = ThumbnailHelper.CopyOriginal(sourceImagePath, destDir, "cover");
+            item.ThumbnailPath = ThumbnailHelper.CopyOriginal(sourceImagePath, destDir, "cover", deleteSource);
             SaveState();
         }
         catch (Exception ex)
