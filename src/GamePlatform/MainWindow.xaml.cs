@@ -733,38 +733,55 @@ public partial class MainWindow : Window
         if (!AppPaths.IsDirectlyUnderGamesBaseDir(folderPath))
         {
             var destFolder = AppPaths.ReserveUniquePath(FileNameHelper.Sanitize(folderName));
-            ShowCompressProgress($"'{folderName}' 폴더를 '{AppPaths.GamesBaseDir}'(으)로 옮기는 중...");
+            ShowCompressProgress($"'{folderName}' 폴더를 '{AppPaths.GamesBaseDir}'(으)로 옮기는 중...", indeterminate: true);
             SetStatus($"'{folderName}' 폴더를 '{AppPaths.GamesBaseDir}'(으)로 옮기는 중입니다...", StatusType.Info);
 
+            // 같은 드라이브 안에서의 이동이면 Directory.Move가 이름 변경 수준으로 즉시 끝나므로(폴더 크기와
+            // 무관하게 빠르다) 먼저 시도해본다 — 실제로 겪은 문제: 항상 복사 후 삭제 방식을 썼더니 같은
+            // 드라이브 안에서 옮길 때도 대용량 게임 폴더가 파일 단위로 통째로 복사되어 불필요하게 오래
+            // 걸렸다. 드라이브가 다르면(Directory.Move가 지원하지 않음) 아래에서 복사 후 삭제로 대체한다.
+            bool renamed;
             try
             {
-                var progress = new Progress<int>(percent => CompressProgressBar.Value = percent);
-                await Task.Run(() => CopyDirectoryContents(folderPath, destFolder, progress));
+                renamed = await Task.Run(() => TryMoveByRename(folderPath, destFolder));
             }
             catch (Exception ex)
             {
-                try { if (Directory.Exists(destFolder)) Directory.Delete(destFolder, recursive: true); } catch { /* 미완성 복사본 정리 시도, 실패해도 무시 */ }
                 SetStatus($"'{folderName}' 폴더를 옮기지 못했습니다: {ex.Message}", StatusType.Error);
                 HideCompressProgress();
                 return;
             }
 
-            targetFolderPath = destFolder;
+            if (!renamed)
+            {
+                ShowCompressProgress($"'{folderName}' 폴더를 '{AppPaths.GamesBaseDir}'(으)로 복사하는 중...");
+                try
+                {
+                    var progress = new Progress<int>(percent => CompressProgressBar.Value = percent);
+                    await Task.Run(() => CopyDirectoryContents(folderPath, destFolder, progress));
+                }
+                catch (Exception ex)
+                {
+                    try { if (Directory.Exists(destFolder)) Directory.Delete(destFolder, recursive: true); } catch { /* 미완성 복사본 정리 시도, 실패해도 무시 */ }
+                    SetStatus($"'{folderName}' 폴더를 옮기지 못했습니다: {ex.Message}", StatusType.Error);
+                    HideCompressProgress();
+                    return;
+                }
 
-            // 복사는 이미 끝났다 — 원본 삭제가 실패해도(파일 잠금 등) 게임은 새 위치 기준으로 등록한다
-            // (게임 압축과 같은 원칙: 핵심 작업 성공과 뒷정리 실패를 분리한다).
-            try
-            {
-                await Task.Run(() => RetryDelete(() => Directory.Delete(folderPath, recursive: true)));
+                // 복사는 이미 끝났다 — 원본 삭제가 실패해도(파일 잠금 등) 게임은 새 위치 기준으로 등록한다
+                // (게임 압축과 같은 원칙: 핵심 작업 성공과 뒷정리 실패를 분리한다).
+                try
+                {
+                    await Task.Run(() => RetryDelete(() => Directory.Delete(folderPath, recursive: true)));
+                }
+                catch (Exception ex)
+                {
+                    SetStatus($"'{folderName}' 폴더를 옮겼지만 원본을 지우지 못했습니다({ex.Message}) — 나중에 수동으로 지워도 됩니다.", StatusType.Warning);
+                }
             }
-            catch (Exception ex)
-            {
-                SetStatus($"'{folderName}' 폴더를 옮겼지만 원본을 지우지 못했습니다({ex.Message}) — 나중에 수동으로 지워도 됩니다.", StatusType.Warning);
-            }
-            finally
-            {
-                HideCompressProgress();
-            }
+
+            targetFolderPath = destFolder;
+            HideCompressProgress();
         }
 
         var item = new GameItem
@@ -1265,9 +1282,26 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>같은 드라이브 안에서의 이동이면 <see cref="Directory.Move"/>로 이름 변경 수준으로 즉시(폴더
+    /// 크기와 무관하게 빠르게) 옮긴다. 성공하면 true. 드라이브가 다르면 <see cref="Directory.Move"/>가
+    /// IOException("Move will not work across volumes")을 던지는데, 이 경우만 false를 돌려주고 호출자가
+    /// <see cref="CopyDirectoryContents"/>로 대체하게 한다 — 그 외의 예외(예: 권한 부족)는 그대로 전파해서
+    /// 호출자가 실패로 처리하게 둔다. 백그라운드 스레드에서 호출된다.</summary>
+    private static bool TryMoveByRename(string sourceDir, string destDir)
+    {
+        try
+        {
+            Directory.Move(sourceDir, destDir);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>폴더를 다른 폴더로 통째로 복사하며 진행률(전체 파일 수 대비 처리한 파일 수)을 보고한다 —
-    /// <see cref="Directory.Move"/>는 드라이브가 다르면 동작하지 않으므로, 게임 추가 시 폴더를
-    /// <see cref="AppPaths.GamesBaseDir"/> 밑으로 옮길 때 복사+원본 삭제 방식으로 쓴다. 백그라운드
+    /// <see cref="TryMoveByRename"/>이 드라이브가 달라 실패했을 때만 쓰는 대체 경로다. 백그라운드
     /// 스레드에서 호출된다.</summary>
     private static void CopyDirectoryContents(string sourceDir, string destDir, IProgress<int> progress)
     {
