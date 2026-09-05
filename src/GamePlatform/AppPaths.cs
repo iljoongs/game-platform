@@ -104,15 +104,19 @@ public static class AppPaths
         }
     }
 
-    /// <summary>주어진 경로가 이미 <see cref="GamesBaseDir"/> 밑(그 폴더 자신 포함)에 있는지 여부. 게임 추가 시
-    /// 폴더/압축 파일을 옮길지 말지 결정하는 데 쓴다 — 이미 기본 폴더 밑에 있으면(예: 압축 명령이 만든 압축
-    /// 파일도 결국 이 밑이므로) 다시 옮기지 않는다(doc/game-management.md "게임 추가" 참고).</summary>
-    public static bool IsUnderGamesBaseDir(string path)
+    /// <summary>주어진 경로가 <see cref="GamesBaseDir"/> 바로 밑에 있는지 여부(더 깊은 하위 폴더는 해당하지
+    /// 않음 — 예: `D:\game\- rpg -\게임`처럼 분류용 하위 폴더 안에 있으면 false). 게임 추가 시 폴더/압축
+    /// 파일을 옮길지 말지 결정하는 데 쓴다 — 이미 기본 폴더 바로 밑에 있으면(예: 압축 명령이 만든 압축 파일도
+    /// 결국 이 밑이므로) 다시 옮기지 않지만, 사용자가 기본 폴더 안에 직접 만들어 둔 분류 폴더 안에 있는 경우는
+    /// "기본 폴더 밑"으로 보지 않고 바로 밑으로 끌어올린다(2026-09-06 수정 — 분류 폴더 안의 게임을 추가해도
+    /// 옮겨지지 않던 문제, 사용자 요청. doc/game-management.md "게임 추가" 참고).</summary>
+    public static bool IsDirectlyUnderGamesBaseDir(string path)
     {
         var full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
         var baseFull = Path.GetFullPath(GamesBaseDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var parent = Path.GetDirectoryName(full);
         return full.Equals(baseFull, StringComparison.OrdinalIgnoreCase)
-            || full.StartsWith(baseFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            || (parent is not null && parent.Equals(baseFull, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <returns>옛 위치에서 데이터를 옮겼으면 true. 이 경우 호출자는 <see cref="RewriteLegacyPath"/>로

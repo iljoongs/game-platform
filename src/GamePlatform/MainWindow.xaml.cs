@@ -464,7 +464,7 @@ public partial class MainWindow : Window
 
         var targetFolderPath = folderPath;
 
-        if (!AppPaths.IsUnderGamesBaseDir(folderPath))
+        if (!AppPaths.IsDirectlyUnderGamesBaseDir(folderPath))
         {
             var destFolder = AppPaths.ReserveUniquePath(FileNameHelper.Sanitize(folderName));
             ShowCompressProgress($"'{folderName}' 폴더를 '{AppPaths.GamesBaseDir}'(으)로 옮기는 중...");
@@ -556,7 +556,7 @@ public partial class MainWindow : Window
         item.ExecutablePath = Path.Combine(gameFolder, chosen);
 
         var archivePath = zipPath;
-        if (!AppPaths.IsUnderGamesBaseDir(zipPath))
+        if (!AppPaths.IsDirectlyUnderGamesBaseDir(zipPath))
         {
             archivePath = AppPaths.ReserveUniquePath(Path.GetFileName(zipPath));
             var zipName = Path.GetFileName(zipPath);
