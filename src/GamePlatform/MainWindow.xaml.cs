@@ -650,6 +650,24 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>새로 추가한 게임 카드/행으로 스크롤을 옮긴다 — 정렬(보기 > 정렬)이 적용되어 있으면 새 게임이
+    /// 목록 끝이 아니라 정렬 순서상의 위치에 나타나므로, 아이콘/리스트 보기 둘 다 실제 화면에 보이는 컨트롤
+    /// 기준으로 그 항목의 컨테이너를 찾아 <see cref="FrameworkElement.BringIntoView()"/>로 스크롤한다
+    /// (2026-09-06 추가, 사용자 요청). `WrapPanel`/`StackPanel`은 가상화하지 않으므로 항목을 추가한 직후에도
+    /// 컨테이너가 이미 만들어져 있지만, 레이아웃이 아직 안 끝났을 수 있어 `Dispatcher.BeginInvoke`로 한 박자
+    /// 늦춰서 찾는다.</summary>
+    private void ScrollGameIntoView(GameItem item)
+    {
+        var activeControl = GamesListView.Visibility == Visibility.Visible ? (ItemsControl)GamesListView : GamesItemsControl;
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (activeControl.ItemContainerGenerator.ContainerFromItem(item) is FrameworkElement container)
+            {
+                container.BringIntoView();
+            }
+        }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+    }
+
     private void AddGameFromExecutable(string executablePath)
     {
         var name = Path.GetFileNameWithoutExtension(executablePath);
@@ -667,6 +685,7 @@ public partial class MainWindow : Window
         _games.Add(item);
         SaveState();
         SetStatus($"'{item.DisplayName}' 게임을 추가했습니다.", StatusType.Success);
+        ScrollGameIntoView(item);
     }
 
     /// <summary>같은 이름의 게임이 이미 있으면(버전만 다르게 여러 개 존재하는 것이 정상 시나리오이므로)
@@ -793,6 +812,7 @@ public partial class MainWindow : Window
         _games.Add(item);
         SaveState();
         SetStatus($"'{item.DisplayName}' 게임을 폴더에서 추가했습니다.", StatusType.Success);
+        ScrollGameIntoView(item);
     }
 
     /// <summary>압축 파일(zip)로 게임을 추가한다 — 압축을 그 자리에서 풀지 않고, zip 자체를 이 게임의 압축
@@ -871,6 +891,7 @@ public partial class MainWindow : Window
             _games.Add(item);
             SaveState();
             SetStatus($"'{item.DisplayName}' 게임을 압축 파일로 추가했습니다 (압축 상태 — 실행하려면 먼저 압축을 풀어야 합니다).", StatusType.Success);
+            ScrollGameIntoView(item);
         }
         catch (Exception ex)
         {

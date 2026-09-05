@@ -53,6 +53,7 @@
 
 메인 화면 빈 영역에 아래 세 가지 중 아무 것이나 드래그드롭하면 새 카드가 생긴다 (`MainWindow_Drop`가 확장자/디렉터리 여부로 구분).
 
+- **추가 후 스크롤 이동**: 세 가지 추가 방식 모두 마지막에 `MainWindow.ScrollGameIntoView(item)`을 불러 새로 추가한 카드/행이 있는 위치로 자동 스크롤한다(2026-09-06 추가, 사용자 요청) — 정렬(위 "메인 화면"의 "정렬" 참고)이 걸려 있으면 새 게임이 목록 맨 끝이 아니라 정렬 순서상의 위치에 나타나므로, 지금 보이는 컨트롤(아이콘 보기의 `GamesItemsControl` 또는 리스트 보기의 `GamesListView`, 두 보기 모두 `CollectionViewSource.GetDefaultView(_games)`를 공유하므로 컨테이너 조회 대상만 다르다)에서 `ItemContainerGenerator.ContainerFromItem`으로 새 항목의 컨테이너를 찾아 `FrameworkElement.BringIntoView()`로 스크롤한다. `WrapPanel`/`StackPanel`은 항목을 가상화하지 않으므로 컨테이너는 추가 직후 이미 존재하지만, 레이아웃이 끝난 뒤에 찾도록 `Dispatcher.BeginInvoke(..., DispatcherPriority.ContextIdle)`로 한 박자 늦춘다.
 - **동일한 이름 확인**: 추가하려는 게임의 `Name`(exe 파일명/폴더 이름/zip 파일명, 확장자 제외)이 이미 목록에 있는 `Name`과 같으면(대소문자 무시), 폴더/압축 파일 이동 등 실제 작업을 시작하기 전에 "버전이 다른 게임인가요?"를 확인 대화상자(예/아니요)로 먼저 묻는다(`MainWindow.ConfirmAddDuplicateName`, 2026-09-06 추가, 사용자 요청) — 위 데이터 모델의 "같은 이름 = 같은 게임의 다른 버전" 전제에 따라, 예를 누르면 새 버전으로 추가를 계속 진행하고, 아니요를 누르면 아무 것도 하지 않고(파일 이동/폴더 복사 등도 시작되지 않음) 추가를 취소한다.
 
 - **실행 파일(exe)**: 가장 단순한 경우. `Name`은 파일명(확장자 제외)으로 자동 채워지고, `ExecutablePath`는 드롭한 파일 경로 그대로 — 옮기거나 복사하지 않는다. (exe 하나만 딸랑 드롭하는 경우라 "폴더/압축 파일"을 옮기는 아래 규칙의 대상이 아니다.)
