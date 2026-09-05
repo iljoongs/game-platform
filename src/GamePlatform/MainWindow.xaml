@@ -16,15 +16,19 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibleConverter"/>
     </Window.Resources>
     <DockPanel>
-        <ToolBarTray DockPanel.Dock="Top">
-            <ToolBar>
-                <TextBlock Text="카드 크기:" VerticalAlignment="Center" Margin="6,0"/>
-                <RadioButton x:Name="LargeSizeRadio" GroupName="CardSize" Content="320x240"
-                             Checked="LargeSizeRadio_Checked" Margin="4,0" VerticalAlignment="Center"/>
-                <RadioButton x:Name="SmallSizeRadio" GroupName="CardSize" Content="160x120"
-                             Checked="SmallSizeRadio_Checked" Margin="8,0" VerticalAlignment="Center"/>
-            </ToolBar>
-        </ToolBarTray>
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="파일(_F)">
+                <MenuItem Header="열기(_O)..." Click="OpenGameDb_Click"/>
+                <MenuItem Header="저장(_S)" Click="SaveGameDb_Click"/>
+                <MenuItem Header="다른 이름으로 저장(_A)..." Click="SaveGameDbAs_Click"/>
+            </MenuItem>
+            <MenuItem Header="보기(_V)">
+                <MenuItem Header="카드 크기">
+                    <MenuItem x:Name="LargeSizeMenuItem" Header="320x240" IsCheckable="True" Click="LargeSizeMenuItem_Click"/>
+                    <MenuItem x:Name="SmallSizeMenuItem" Header="160x120" IsCheckable="True" Click="SmallSizeMenuItem_Click"/>
+                </MenuItem>
+            </MenuItem>
+        </Menu>
         <!-- 상태바(video-vault의 SeriesManagerWindow 패턴) — 게임 추가/삭제/썸네일 지정/압축 등 각종 이벤트를
              대화상자 대신 여기 표시한다. 종류(성공/경고/정보/오류)에 따라 아이콘과 글자색이 SetStatus에서 정해진다. -->
         <Border DockPanel.Dock="Bottom" CornerRadius="6" BorderBrush="#E0E0E0" BorderThickness="1"
@@ -61,6 +65,8 @@
                                 Drop="Card_Drop">
                             <Border.ContextMenu>
                                 <ContextMenu>
+                                    <MenuItem Header="썸네일 삭제" Click="DeleteThumbnail_Click"
+                                              Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVisibleConverter}}"/>
                                     <MenuItem Header="압축" Click="CompressGame_Click"
                                               Visibility="{Binding CanCompress, Converter={StaticResource BoolToVisibleConverter}}"/>
                                     <MenuItem Header="삭제" Click="DeleteGame_Click"/>

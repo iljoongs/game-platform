@@ -17,11 +17,17 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<GameItem> _games;
     private readonly AppSettings _settings;
 
+    /// <summary>지금 저장/불러오기 대상인 게임 목록 파일. 기본값은 <see cref="AppPaths.GamesPath"/>이지만
+    /// 파일 메뉴의 "열기"/"다른 이름으로 저장"으로 바뀔 수 있다 — 그 뒤로는 자동 저장(<see cref="SaveState"/>)도
+    /// 이 경로를 따라간다(doc/game-management.md "게임 목록 파일 관리" 참고).</summary>
+    private string _currentGamesPath;
+
     public MainWindow()
     {
         InitializeComponent();
 
         var didMigrateAppData = AppPaths.EnsureAppDataDirectory();
+        _currentGamesPath = AppPaths.GamesPath;
 
         _settings = SettingsRepository.Load();
         WindowPositionMemory.LoadFrom(_settings.WindowPositions);
@@ -29,14 +35,14 @@ public partial class MainWindow : Window
 
         var preset = Enum.TryParse<GameCardSize>(_settings.CardSizePreset, out var parsed) ? parsed : GameCardSize.Large;
         GameCardSizeSettings.Current.Apply(preset);
-        (preset == GameCardSize.Small ? SmallSizeRadio : LargeSizeRadio).IsChecked = true;
+        UpdateCardSizeMenuChecks(preset);
 
         var screenshotPreset = Enum.TryParse<GameScreenshotSize>(_settings.ScreenshotSizePreset, out var parsedScreenshotPreset)
             ? parsedScreenshotPreset
             : GameScreenshotSize.Large;
         GameScreenshotSizeSettings.Current.Apply(screenshotPreset);
 
-        _games = new ObservableCollection<GameItem>(GameLibraryRepository.Load());
+        _games = new ObservableCollection<GameItem>(GameLibraryRepository.Load(_currentGamesPath));
 
         // 데이터 폴더 이동이 이번 실행이 아니라 이전에 이미 일어났을 수도 있으므로(예: 파일만 옮겨진 뒤
         // 경로 문자열 교정 전에 껐다 켠 경우), 매번 확인한다 — 옛 경로가 없으면 그냥 아무 것도 하지 않는다.
@@ -51,7 +57,7 @@ public partial class MainWindow : Window
 
         ApplyWindowBounds();
 
-        BackupService.CheckAndBackup(_settings);
+        BackupService.CheckAndBackup(_settings, _currentGamesPath);
 
         SetStatus(didMigrateAppData
             ? $"데이터 폴더를 '{AppPaths.GamesBaseDir}' 밑으로 옮겼습니다."
@@ -128,7 +134,7 @@ public partial class MainWindow : Window
 
         if (changed)
         {
-            GameLibraryRepository.Save(_games);
+            GameLibraryRepository.Save(_games, _currentGamesPath);
         }
     }
 
@@ -158,16 +164,81 @@ public partial class MainWindow : Window
         SettingsRepository.Save(_settings);
     }
 
-    private void LargeSizeRadio_Checked(object sender, RoutedEventArgs e) => ChangeCardSize(GameCardSize.Large);
+    private void LargeSizeMenuItem_Click(object sender, RoutedEventArgs e) => ChangeCardSize(GameCardSize.Large);
 
-    private void SmallSizeRadio_Checked(object sender, RoutedEventArgs e) => ChangeCardSize(GameCardSize.Small);
+    private void SmallSizeMenuItem_Click(object sender, RoutedEventArgs e) => ChangeCardSize(GameCardSize.Small);
 
     private void ChangeCardSize(GameCardSize size)
     {
         GameCardSizeSettings.Current.Apply(size);
+        UpdateCardSizeMenuChecks(size);
         _settings.CardSizePreset = size.ToString();
         SettingsRepository.Save(_settings);
     }
+
+    /// <summary>"보기 > 카드 크기" 메뉴는 라디오 버튼처럼 하나만 체크되어야 하는데, WPF `MenuItem`은
+    /// `RadioButton.GroupName`같은 상호 배타 그룹을 제공하지 않아 직접 관리한다.</summary>
+    private void UpdateCardSizeMenuChecks(GameCardSize size)
+    {
+        LargeSizeMenuItem.IsChecked = size == GameCardSize.Large;
+        SmallSizeMenuItem.IsChecked = size == GameCardSize.Small;
+    }
+
+    #region 게임 목록 파일 (열기 / 저장 / 다른 이름으로 저장)
+
+    private void OpenGameDb_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = "게임 목록 파일 (*.json)|*.json|모든 파일 (*.*)|*.*",
+            InitialDirectory = Path.GetDirectoryName(_currentGamesPath),
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        var loaded = GameLibraryRepository.Load(dialog.FileName);
+
+        _games.Clear();
+        foreach (var game in loaded)
+        {
+            game.RefreshExecutableValid();
+            game.RefreshArchiveValid();
+            _games.Add(game);
+        }
+
+        _currentGamesPath = dialog.FileName;
+        SetStatus($"'{Path.GetFileName(_currentGamesPath)}' 파일을 열었습니다 ({_games.Count}개 게임). 앞으로 이 파일에 자동 저장됩니다.", StatusType.Success);
+    }
+
+    private void SaveGameDb_Click(object sender, RoutedEventArgs e)
+    {
+        GameLibraryRepository.Save(_games, _currentGamesPath);
+        SetStatus($"'{Path.GetFileName(_currentGamesPath)}'에 저장했습니다.", StatusType.Success);
+    }
+
+    private void SaveGameDbAs_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "게임 목록 파일 (*.json)|*.json|모든 파일 (*.*)|*.*",
+            FileName = Path.GetFileName(_currentGamesPath),
+            InitialDirectory = Path.GetDirectoryName(_currentGamesPath),
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        _currentGamesPath = dialog.FileName;
+        GameLibraryRepository.Save(_games, _currentGamesPath);
+        SetStatus($"'{Path.GetFileName(_currentGamesPath)}'(으)로 저장했습니다. 앞으로 이 파일에 자동 저장됩니다.", StatusType.Success);
+    }
+
+    #endregion
 
     #region 상태바
 
@@ -405,6 +476,30 @@ public partial class MainWindow : Window
         {
             SetStatus($"썸네일을 지정하지 못했습니다: {ex.Message}", StatusType.Error);
         }
+    }
+
+    private void DeleteThumbnail_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: GameItem item } || !item.HasThumbnail)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!string.IsNullOrEmpty(item.ThumbnailPath) && File.Exists(item.ThumbnailPath))
+            {
+                File.Delete(item.ThumbnailPath);
+            }
+        }
+        catch
+        {
+            // 파일 삭제 실패는 무시한다 — 그래도 목록에서는 참조를 지운다.
+        }
+
+        item.ThumbnailPath = null;
+        SaveState();
+        SetStatus($"'{item.DisplayName}'의 대표 썸네일을 삭제했습니다.", StatusType.Success);
     }
 
     private void DeleteGame_Click(object sender, RoutedEventArgs e)
@@ -726,8 +821,8 @@ public partial class MainWindow : Window
     /// 이미지 크기 설정 등 무엇이 바뀌든 이 하나의 콜백으로 저장을 위임받는다.</summary>
     private void SaveState()
     {
-        GameLibraryRepository.Save(_games);
+        GameLibraryRepository.Save(_games, _currentGamesPath);
         SettingsRepository.Save(_settings);
-        BackupService.CheckAndBackup(_settings);
+        BackupService.CheckAndBackup(_settings, _currentGamesPath);
     }
 }

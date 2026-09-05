@@ -23,13 +23,15 @@ public static class AppPaths
 
     public static string SettingsPath => Path.Combine(AppDataDir, "settings.json");
 
-    private static string BackupDir => Path.Combine(AppDataDir, "backup");
+    /// <summary>게임 목록 파일(어떤 파일이든 — 메인 창의 파일 메뉴로 다른 파일을 열었을 수도 있으므로) 바로
+    /// 옆에 두는 백업 폴더. 백업은 항상 "지금 실제로 저장 중인 파일" 기준으로 동작한다.</summary>
+    private static string BackupDir(string gamesPath) => Path.Combine(Path.GetDirectoryName(gamesPath)!, "backup");
 
     /// <summary>최근 1일 주기 백업 (덮어씀, 파일 하나만 유지).</summary>
-    public static string DailyBackupPath => Path.Combine(BackupDir, "games.daily.json");
+    public static string DailyBackupPath(string gamesPath) => Path.Combine(BackupDir(gamesPath), "games.daily.json");
 
     /// <summary>최근 1주 주기 백업 (덮어씀, 파일 하나만 유지).</summary>
-    public static string WeeklyBackupPath => Path.Combine(BackupDir, "games.weekly.json");
+    public static string WeeklyBackupPath(string gamesPath) => Path.Combine(BackupDir(gamesPath), "games.weekly.json");
 
     private static string ImagesDir => Path.Combine(AppDataDir, "images");
 
@@ -120,5 +122,5 @@ public static class AppPaths
         }
     }
 
-    public static void EnsureBackupDirectory() => Directory.CreateDirectory(BackupDir);
+    public static void EnsureBackupDirectory(string gamesPath) => Directory.CreateDirectory(BackupDir(gamesPath));
 }
