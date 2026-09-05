@@ -25,8 +25,26 @@
                              Checked="SmallSizeRadio_Checked" Margin="8,0" VerticalAlignment="Center"/>
             </ToolBar>
         </ToolBarTray>
-        <TextBlock DockPanel.Dock="Bottom" Margin="8" Foreground="Gray"
-                   Text="실행 파일(exe)을 이 창에 끌어다 놓으면 새 게임이 추가됩니다. 카드에 이미지를 끌어다 놓으면 대표 썸네일이 지정됩니다. 카드 우클릭으로 삭제/압축할 수 있습니다."/>
+        <!-- 상태바(video-vault의 SeriesManagerWindow 패턴) — 게임 추가/삭제/썸네일 지정/압축 등 각종 이벤트를
+             대화상자 대신 여기 표시한다. 종류(성공/경고/정보/오류)에 따라 아이콘과 글자색이 SetStatus에서 정해진다. -->
+        <Border DockPanel.Dock="Bottom" CornerRadius="6" BorderBrush="#E0E0E0" BorderThickness="1"
+                Background="#FAFAFA" Padding="10,6" Margin="8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock x:Name="StatusIcon" FontSize="12" FontWeight="Bold" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="StatusText" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+                <StackPanel x:Name="CompressProgressPanel" Grid.Column="1" Orientation="Horizontal"
+                            Visibility="Collapsed" VerticalAlignment="Center" Margin="12,0,0,0">
+                    <TextBlock x:Name="CompressProgressLabel" FontSize="11" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                    <ProgressBar x:Name="CompressProgressBar" Width="140" Height="14" Minimum="0" Maximum="100"/>
+                </StackPanel>
+            </Grid>
+        </Border>
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <ItemsControl x:Name="GamesItemsControl">
                 <ItemsControl.ItemsPanel>

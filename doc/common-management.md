@@ -2,7 +2,7 @@
 
 > [메인 지시서](../CLAUDE.md)의 하위 문서. 특정 게임 항목에 속하지 않고 앱 전체에 적용되는 것들 — 저장 경로, 설정, 썸네일/드래그앤드롭 공용 인프라, 오류 처리 — 을 모은다. 게임 카드/실행/정보 창 자체는 [게임 관리](game-management.md) 참고.
 
-**관련 파일 (예정, 아직 미구현)**: `App.xaml`/`.xaml.cs`, `AppPaths.cs`, `AppSettings.cs`, `SettingsRepository.cs`, `ImageLoadHelper.cs`, `ThumbnailPathConverter.cs`, `ThumbnailHelper.cs`, `DragDropImageHelper.cs`, `OriginalImageWindow.xaml`/`.xaml.cs`, `SingleInstanceWindow.cs`, `WindowPositionMemory.cs`, `WindowSizeMemory.cs`, `BackupService.cs`
+**관련 파일**: `App.xaml`/`.xaml.cs`, `AppPaths.cs`, `AppSettings.cs`, `SettingsRepository.cs`, `ImageLoadHelper.cs`, `ThumbnailPathConverter.cs`, `ThumbnailHelper.cs`, `DragDropImageHelper.cs`, `OriginalImageWindow.xaml`/`.xaml.cs`, `SingleInstanceWindow.cs`, `WindowPositionMemory.cs`, `WindowSizeMemory.cs`, `BackupService.cs`, `FileNameHelper.cs`, `SelectExecutableWindow.xaml`/`.xaml.cs`
 
 ## video-vault에서 이식하는 인프라
 
@@ -17,10 +17,15 @@
 
 ## 저장 위치
 
-video-vault의 `AppPaths` 패턴을 따라 `%LOCALAPPDATA%\GamePlatform\` 아래에 둔다.
+**게임 관련 파일의 기본 폴더는 `D:\game`이다** (`AppPaths.GamesBaseDir`, 2026-09-05 확정 — 사용자 요청). 이 앱의 관리 데이터도 그 밑의 `GamePlatform` 폴더에 둔다(video-vault의 `%LOCALAPPDATA%\VideoVault\` 패턴 대신, 게임 관련 파일과 한 드라이브·한 폴더 밑에 모아두기 위함).
 
 ```
-%LOCALAPPDATA%\GamePlatform\
+D:\game\
+├── GamePlatform\                  # 앱 관리 데이터 (아래 상세)
+├── {게임 이름}\                   # 사용자가 이미 설치해 둔 게임들 (앱이 관리하지 않음, exe 드래그드롭 시 원본 위치 그대로 참조)
+└── {게임 이름}\                   # 압축 파일(zip)로 추가한 게임의 압축 해제 예정 위치 (아래 "게임 추가"/"게임 압축" 참고)
+
+D:\game\GamePlatform\
 ├── games.json                 # 게임 목록 (GameItem 배열)
 ├── settings.json              # 카드 크기 등 전역 설정
 ├── backup\
@@ -31,10 +36,18 @@ video-vault의 `AppPaths` 패턴을 따라 `%LOCALAPPDATA%\GamePlatform\` 아래
 │       ├── cover.original.*            # 대표 썸네일 (원본 크기 그대로)
 │       └── screenshot-{guid}.original.*  # 게임 요약 캡처 (각각 원본 크기 그대로)
 └── archives\
-    └── {게임 Id}.zip           # 압축된 게임 (게임 폴더 전체) — doc/game-management.md "게임 압축" 참고
+    └── {게임 Id}\
+        └── {이름-버전}.zip     # 압축된 게임 (게임 폴더 전체) — doc/game-management.md "게임 압축" 참고
 ```
 
 게임의 실행 파일(exe)은 사용자가 이미 설치해 둔 임의의 위치(다른 드라이브, 읽기 전용 폴더 등)를 가리킬 수 있으므로, video-vault처럼 원본 파일과 같은 폴더에 썸네일을 저장하지 않고 앱 데이터 폴더 안에 게임 Id별로 모아 저장한다.
+
+### 옛 위치(`%LOCALAPPDATA%\GamePlatform\`)에서 자동 이동
+
+앱이 처음에 `%LOCALAPPDATA%\GamePlatform\`를 썼다가 이후 `D:\game\GamePlatform\`로 옮겼다(2026-09-05). 실제 사용자 데이터가 이미 쌓여 있었으므로, 새 버전을 켰을 때 자동으로 마이그레이션한다 (`AppPaths.EnsureAppDataDirectory`, `MainWindow` 시작 시 호출):
+
+1. 새 위치(`D:\game\GamePlatform\`)가 없고 옛 위치가 있으면, 옛 폴더 전체를 새 위치로 복사한 뒤 옛 폴더를 지운다. `Directory.Move`는 드라이브가 다르면("C:\ → D:\") 동작하지 않아서("Move will not work across volumes" — 실제로 겪은 오류) 직접 복사+삭제로 구현했다.
+2. **파일을 옮기는 것과 `games.json`에 저장된 절대경로 문자열(`ThumbnailPath`/`Screenshots[].Path`/`ArchivePath`)을 바로잡는 것은 별개다** — 1번은 디스크상의 실제 파일 위치만 바꿀 뿐, 이미 로드된 JSON의 경로 문자열까지 자동으로 바뀌지는 않는다. `MainWindow`가 게임 목록을 불러온 직후 `RewriteLegacyImagePaths()`로 옛 접두사(`%LOCALAPPDATA%\GamePlatform\`)로 시작하는 경로를 전부 새 접두사로 바꿔 다시 저장한다. 이 검사는 옛 경로가 하나도 없으면 아무 것도 하지 않는 가벼운 스캔이라, 마이그레이션이 이번 실행에서 일어났는지 여부와 무관하게 **매번** 실행한다 — 파일 이동과 경로 교정이 서로 다른 실행에서 일어나는 경우(예: 이동만 되고 교정 전에 껐다 켠 경우)에도 안전하게 만회하기 위함이다.
 
 ## 설정 관리 (`settings.json`)
 
@@ -55,13 +68,13 @@ video-vault의 `AppPaths` 패턴을 따라 `%LOCALAPPDATA%\GamePlatform\` 아래
 `games.json`(게임 목록 데이터)을 주기적으로 백업한다. 일간/주간 각각 **파일 하나씩만** 유지한다 (날짜별로 계속 쌓지 않고, 같은 파일에 덮어쓴다).
 
 ```
-%LOCALAPPDATA%\GamePlatform\backup\
+D:\game\GamePlatform\backup\
 ├── games.daily.json    # 최근 1일 주기 백업 (덮어씀)
 └── games.weekly.json   # 최근 1주 주기 백업 (덮어씀)
 ```
 
 - `settings.json`에 저장해 둔 `LastDailyBackupUtc`/`LastWeeklyBackupUtc`를 기준으로, 마지막 백업 이후 하루/일주일이 지났으면 그 시점의 `games.json`을 각각의 백업 파일로 복사하고 타임스탬프를 갱신한다. 앱 시작 시 한 번, 그리고 `games.json` 저장 시점마다 이 조건을 확인한다 — 앱을 매일 켜지 않아도 다음 실행 시 지난 기간만큼 자동으로 따라잡는다.
-- 복구는 아직 UI로 제공하지 않는다 (필요 시 `%LOCALAPPDATA%\GamePlatform\backup\`의 파일을 `games.json`에 수동으로 덮어쓰는 방식). 향후 "백업에서 복원" 메뉴를 추가할 수 있다.
+- 복구는 아직 UI로 제공하지 않는다 (필요 시 `D:\game\GamePlatform\backup\`의 파일을 `games.json`에 수동으로 덮어쓰는 방식). 향후 "백업에서 복원" 메뉴를 추가할 수 있다.
 
 ## 오류 처리
 

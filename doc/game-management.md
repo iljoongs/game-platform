@@ -2,7 +2,7 @@
 
 > [메인 지시서](../CLAUDE.md)의 하위 문서. 게임 카드 목록(메인 화면), 실행, 정보 창을 다룬다. 썸네일 저장·드래그앤드롭 공용 인프라는 [공통 관리](common-management.md) 참고.
 
-**관련 파일**: `GameItem.cs`, `GameLibraryRepository.cs`, `MainWindow.xaml`/`.xaml.cs`, `GameInfoWindow.xaml`/`.xaml.cs`, `GameCardSizeSettings.cs`, `GameScreenshotSizeSettings.cs`, `EmptyPathToVisibleConverter.cs`
+**관련 파일**: `GameItem.cs`, `GameLibraryRepository.cs`, `MainWindow.xaml`/`.xaml.cs`, `GameInfoWindow.xaml`/`.xaml.cs`, `GameCardSizeSettings.cs`, `GameScreenshotSizeSettings.cs`, `EmptyPathToVisibleConverter.cs`, `SelectExecutableWindow.xaml`/`.xaml.cs`, `FileNameHelper.cs`
 
 ## 데이터 모델 (`GameItem`)
 
@@ -20,6 +20,7 @@
 | `IsCompressed` | 이 게임이 지금 압축(zip)된 상태인지 — 아래 "게임 압축" 참고 |
 | `ArchivePath` | 압축 파일 경로 (`AppPaths.GameArchivePath`). 압축 상태가 아니면 `null` |
 | `ArchiveSizeBytes` / `CompressedAtUtc` | 압축 파일 크기, 압축을 수행한 시각(UTC). 정보 창의 압축 정보 표시용 |
+| `IsBusy` | (저장하지 않는 런타임 전용) 이 게임 자신의 압축/압축 해제가 지금 진행 중인지 — 중복 실행 방지용. 다른 게임의 압축과는 무관 |
 
 `ExecutablePath`가 실제로 존재하는지 여부(`IsExecutableValid` 등, JSON에는 저장하지 않는 런타임 계산 값)는 앱 시작 시와 정보 창에서 경로를 바꿀 때마다 `File.Exists`로 다시 판단한다 — 아래 "실행 / 압축 풀기" 절 참고. 압축 파일이 실제로 존재하는지(`IsArchiveValid`)도 같은 시점에 다시 확인한다.
 
@@ -28,26 +29,39 @@
 ## 메인 화면 (카드 목록)
 
 - 카드 그리드에 게임 카드를 나열한다. 각 카드: 대표 썸네일 + `DisplayName`("이름-버전", 위 데이터 모델 참고) + 하단 [정보][실행/압축 풀기] 버튼 두 개. 두 번째 버튼은 압축 상태(`IsCompressed`)에 따라 문구와 동작이 바뀐다 — 아래 "실행 / 압축 풀기" 참고.
-- **새 게임 추가**: 메인 화면 빈 영역에 실행 파일(exe)을 드래그드롭하면 새 카드가 생성된다. `Name`은 파일명(확장자 제외)으로 자동 채워지고, `ExecutablePath`는 드롭한 파일 경로로 설정된다. 이름/버전/설명 등 나머지 정보는 이후 정보 창에서 채운다.
 - **대표 썸네일 지정**: 이미 만들어진 카드 위에 이미지 파일을 드래그드롭하면 그 카드의 대표 썸네일로 지정된다 ([공통 관리](common-management.md)의 `DragDropImageHelper` 재사용). 게임 요약 스크린샷과 달리 **리사이즈본을 따로 만들지 않고 원본 크기 그대로 저장**한다(`ThumbnailHelper.CopyOriginal`) — 카드 한 장에 한 번만 쓰는 이미지라 미리 축소해둘 이유가 없고, 화면에는 카드 크기(아래 "카드 크기")에 맞게 WPF가 그때그때 스케일해서 보여준다.
   - 카드의 `Border`는 `Background="Transparent"`를 명시적으로 지정한다 — WPF는 `Background`가 `null`인 요소의 빈 공간(자식이 없는 영역, 또는 아직 썸네일이 없어 `Image`가 빈 카드의 내부)을 히트테스트하지 않으므로, 이 설정이 없으면 그 위에 드롭해도 이벤트가 카드가 아니라 그 뒤의 `Window`로 전달되어(그리고 `Window`는 exe가 아닌 파일은 무시하므로) 아무 일도 일어나지 않는 것처럼 보인다(실제로 있었던 버그, 2026-09-05 수정) — 새로 드롭 대상 영역을 추가할 때는 항상 `Background`를 명시한다.
-- **삭제**: 카드 우클릭 → 컨텍스트 메뉴 "삭제". `games.json` 목록에서 제거함과 동시에, 이 게임에 연결된 이미지 파일(대표 썸네일, 게임 요약 스크린샷 전부 — [공통 관리](common-management.md)의 `images\{게임 Id}\` 폴더)과, 압축 상태라면 압축 파일(`ArchivePath`)도 함께 삭제한다. 실행 파일(exe)이나 그 폴더(압축되지 않은 상태) 자체는 사용자의 게임 설치 파일이므로 지우지 않는다.
+- **삭제**: 카드 우클릭 → 컨텍스트 메뉴 "삭제" → 확인 대화상자. `games.json` 목록에서 제거함과 동시에, 이 게임에 연결된 이미지 파일(대표 썸네일, 게임 요약 스크린샷 전부 — [공통 관리](common-management.md)의 `images\{게임 Id}\` 폴더)과, 압축 상태라면 압축 파일(`ArchivePath`)도 함께 삭제한다. 실행 파일(exe)이나 그 폴더(압축되지 않은 상태) 자체는 사용자의 게임 설치 파일이므로 지우지 않는다.
 - **카드 크기**: 320x240(기본) / 160x120 두 프리셋을 전역 설정으로 전환한다 (`GameCardSizeSettings`, video-vault의 `IconSizeSettings`와 같은 역할이지만 프리셋이 2개뿐이라는 점이 다르다). 전환하면 화면의 모든 카드가 동시에 바뀐다.
+- **상태바**: 창 아래쪽에 video-vault의 `SeriesManagerWindow`와 같은 형태(아이콘 + 텍스트, 성공/경고/정보/오류 종류별로 색이 다름 — `SetStatus`)로 상태바를 둔다. 게임 추가/삭제/썸네일 지정/압축 시작·완료/압축 풀기 시작·완료/실행 실패 등 각종 이벤트를 여기 표시한다. 삭제 확인, 압축 확인, exe 여러 개 중 선택처럼 **사용자의 결정이 필요한 경우는 여전히 대화상자**를 쓴다 — 상태바는 결과를 알려주는 용도이지 입력을 받는 용도가 아니다. 시작 시 기본 메시지로 드래그드롭 사용법 안내를 보여준다.
+
+## 게임 추가
+
+메인 화면 빈 영역에 아래 세 가지 중 아무 것이나 드래그드롭하면 새 카드가 생긴다 (`MainWindow_Drop`가 확장자/디렉터리 여부로 구분).
+
+- **실행 파일(exe)**: 가장 단순한 경우. `Name`은 파일명(확장자 제외)으로 자동 채워지고, `ExecutablePath`는 드롭한 파일 경로 그대로 — 옮기거나 복사하지 않는다.
+- **폴더**: 그 폴더 안(하위 폴더 포함)에서 `*.exe` 파일을 전부 찾는다. 하나면 바로 그것을 쓰고, 여러 개면 [실행 파일 선택] 대화상자(`SelectExecutableWindow`)를 띄워 사용자가 직접 고르게 한다 — 설치 프로그램/제거 프로그램/재배포 패키지(vcredist 등) 등이 섞여 있을 수 있어 자동 추측은 채택하지 않았다. `Name`은 폴더 이름, `ExecutablePath`는 그 폴더 안 실제 위치 그대로 (폴더 자체는 옮기지 않는다 — exe 드래그드롭과 동일한 원칙).
+- **압축 파일(zip)**: **압축을 그 자리에서 풀지 않고, 압축된 상태로 게임을 등록한다** (`IsCompressed = true`). zip 안의 항목을 열어(풀지 않고) `*.exe` 항목을 찾고, 여러 개면 마찬가지로 선택 대화상자를 띄운다. `Name`은 zip 파일명(확장자 제외). 이후 처리:
+  1. [공통 관리](common-management.md)의 `AppPaths.GamesBaseDir`(`D:\game`) 밑에 `{DisplayName}` 폴더를 압축 해제 예정 위치로 예약한다(`AppPaths.ReserveGameFolder` — 실제로 폴더를 만들지는 않는다). `ExecutablePath`는 이 예약된 폴더 밑, zip 안에서 고른 exe의 상대 경로로 미리 계산해둔다.
+  2. 드롭한 zip 파일 자체를 이 게임의 압축 파일 저장 위치(`AppPaths.GameArchivePath`)로 **이동**한다(복사가 아니라 이동 — 압축을 다시 할 필요가 없으므로 원본을 그대로 재사용).
+  3. 사용자가 나중에 카드의 [압축 풀기]를 누르면(아래 "실행 / 압축 풀기" 참고) 1번에서 계산해둔 위치에 실제로 풀린다.
+  - 이 경로를 택한 이유: 이미 압축되어 있는 파일을 굳이 즉시 풀었다가 나중에 또 압축하는 왕복을 피하고, 디스크 공간도 필요할 때까지 아끼기 위함.
 
 ## 실행 / 압축 풀기 (Run / Extract)
 
 카드의 두 번째 버튼은 압축 상태에 따라 동작이 바뀐다 (`GameItem.RunButtonLabel`/`IsRunButtonEnabled`).
 
 - **압축 상태가 아니면 [실행]**: `Process.Start(ExecutablePath)`로 실행하고, `WorkingDirectory`는 실행 파일이 있는 폴더로 지정한다 (상대 경로로 리소스를 찾는 게임을 위해). `ExecutablePath`가 비어 있거나 파일이 더 이상 존재하지 않으면 버튼 자체를 비활성화한다 (클릭 시 오류 메시지를 띄우는 대신, 애초에 누를 수 없게 한다).
-- **압축 상태면 [압축 풀기]**: 압축 파일(`ArchivePath`)을 `ExecutablePath`가 원래 있던 폴더 위치에 그대로 풀고, 압축 파일은 삭제한 뒤 압축 해제 이전 상태(`IsCompressed = false`)로 되돌린다. 압축 파일이 없어지면 이 버튼도 비활성화된다.
-- 존재 여부(`IsExecutableValid`/`IsArchiveValid`)는 앱 시작 시 전체 항목에 대해, 그리고 정보 창에서 실행 파일 경로를 바꾸거나 압축/압축 해제를 할 때 다시 확인한다.
+- **압축 상태면 [압축 풀기]**: 압축 파일(`ArchivePath`)을 `ExecutablePath`가 가리키는 폴더 위치(exe로 압축한 게임이면 원래 있던 폴더, zip으로 추가한 게임이면 추가 시 예약해둔 폴더 — 위 "게임 추가" 참고)에 풀고, 압축 파일은 삭제한 뒤 압축 해제 이전 상태(`IsCompressed = false`)로 되돌린다. 압축과 마찬가지로 백그라운드 스레드에서 진행하며 상태바에 진행바가 뜬다 — 아래 "게임 압축" 참고.
+- 존재 여부(`IsExecutableValid`/`IsArchiveValid`)는 앱 시작 시 전체 항목에 대해, 그리고 정보 창에서 실행 파일 경로를 바꾸거나 압축/압축 해제를 할 때 다시 확인한다. 이 게임 자신의 압축/압축 해제가 진행 중이면(`IsBusy`) 두 버튼 모두 비활성화된다.
 
 ## 게임 압축
 
-메인 화면 카드 우클릭 → 컨텍스트 메뉴 "압축"(이미 압축된 게임에는 나타나지 않는다 — `GameItem.CanCompress`).
+메인 화면 카드 우클릭 → 컨텍스트 메뉴 "압축"(이미 압축된 게임, 또는 이 게임 자신이 지금 압축/압축 풀기 중이면 나타나지 않는다 — `GameItem.CanCompress`).
 
-- `ExecutablePath`가 있는 **폴더 전체**(exe 하나가 아니라 게임을 구성하는 모든 파일)를 확인 대화상자를 거쳐 zip으로 묶어 `AppPaths.GameArchivePath(게임 Id)`(`%LOCALAPPDATA%\GamePlatform\archives\{게임 Id}.zip`)에 저장하고, **원본 폴더는 삭제**해 디스크 공간을 확보한다. `ExecutablePath` 자체(문자열 경로)는 바꾸지 않는다 — 압축을 풀면 같은 위치에 다시 폴더가 생기기 때문이다.
-- 압축 중에는 마우스 커서를 대기 모양으로 바꿔두는 것 외에 별도 진행률 표시는 없다 — 동기적으로 실행되므로 큰 폴더는 완료까지 UI가 잠깐 멈출 수 있다 (향후 비동기 전환 검토 대상).
+- `ExecutablePath`가 있는 **폴더 전체**(exe 하나가 아니라 게임을 구성하는 모든 파일)를 확인 대화상자를 거쳐 zip으로 묶어 `AppPaths.GameArchivePath(게임 Id, DisplayName)`(`D:\game\GamePlatform\archives\{게임 Id}\{이름-버전}.zip` — **압축 파일 이름은 메인 화면에 보이는 이름을 그대로 쓴다**, 파일명에 못 쓰는 문자는 `FileNameHelper.Sanitize`가 `_`로 바꾼다)에 저장하고, **원본 폴더는 삭제**해 디스크 공간을 확보한다. `ExecutablePath` 자체(문자열 경로)는 바꾸지 않는다 — 압축을 풀면 같은 위치에 다시 폴더가 생기기 때문이다.
+- **백그라운드 스레드에서 진행**한다(`Task.Run`) — 압축 중에도 창을 움직이거나 다른 카드를 조작할 수 있다. 같은 게임을 중복으로 압축/압축 해제하는 것만 `GameItem.IsBusy`로 막으며(그동안 이 카드의 [실행/압축 풀기] 버튼과 "압축" 메뉴가 비활성화된다), **다른 게임은 동시에 압축할 수 있다**.
+- **상태바에 진행바를 보여준다**. `System.IO.Compression.ZipFile.CreateFromDirectory`는 진행률 콜백을 제공하지 않으므로, 파일을 하나씩 직접 `ZipArchive.CreateEntryFromFile`로 압축하며 (처리한 파일 수 / 전체 파일 수) 기준으로 퍼센트를 계산해 `IProgress<int>`로 보고한다(`MainWindow.CompressDirectory`). 압축 풀기도 대칭으로 항목 단위 진행률을 보여준다(`MainWindow.ExtractArchive`).
 - 실행 파일이 지정되지 않았거나 그 폴더를 찾을 수 없으면 압축하지 않고 안내 메시지만 보여준다.
 - 되돌리는 방법은 카드의 [압축 풀기] 버튼(위 "실행 / 압축 풀기" 참고)뿐이며, 압축 메뉴 자체에는 "압축 풀기" 항목을 따로 두지 않는다.
 

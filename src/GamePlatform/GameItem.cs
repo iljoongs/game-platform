@@ -22,6 +22,7 @@ public class GameItem : INotifyPropertyChanged
     private long _archiveSizeBytes;
     private DateTime? _compressedAtUtc;
     private bool _isArchiveValid;
+    private bool _isBusy;
 
     /// <summary>고유 식별자. 이미지 저장 폴더명(<see cref="AppPaths.GameImagesDir"/>)으로 쓰인다.</summary>
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -149,14 +150,34 @@ public class GameItem : INotifyPropertyChanged
     [JsonIgnore]
     public string RunButtonLabel => IsCompressed ? "압축 풀기" : "실행";
 
-    /// <summary>메인 카드 두 번째 버튼의 활성화 여부. 압축 상태면 압축 파일이 있어야, 아니면 실행 파일이 있어야 활성화된다.</summary>
+    /// <summary>메인 카드 두 번째 버튼의 활성화 여부. 압축 상태면 압축 파일이 있어야, 아니면 실행 파일이 있어야 활성화된다.
+    /// 이 게임 자신의 압축/압축 해제가 진행 중이면(<see cref="IsBusy"/>) 항상 비활성화된다.</summary>
     [JsonIgnore]
-    public bool IsRunButtonEnabled => IsCompressed ? IsArchiveValid : IsExecutableValid;
+    public bool IsRunButtonEnabled => !IsBusy && (IsCompressed ? IsArchiveValid : IsExecutableValid);
 
-    /// <summary>카드 우클릭 메뉴의 "압축" 항목을 보여줄지 여부 — 이미 압축된 게임은 다시 압축할 수 없다
-    /// (압축을 풀려면 카드의 압축 풀기 버튼을 쓴다).</summary>
+    /// <summary>카드 우클릭 메뉴의 "압축" 항목을 보여줄지 여부 — 이미 압축된 게임은 다시 압축할 수 없고
+    /// (압축을 풀려면 카드의 압축 풀기 버튼을 쓴다), 이 게임 자신의 압축/압축 해제가 진행 중일 때도 숨긴다.</summary>
     [JsonIgnore]
-    public bool CanCompress => !IsCompressed;
+    public bool CanCompress => !IsBusy && !IsCompressed;
+
+    /// <summary>이 게임의 압축/압축 해제가 지금 진행 중인지 여부 — 진행 중에는 같은 게임에 대한 압축/압축 해제를
+    /// 중복으로 시작할 수 없게 막는다(다른 게임은 동시에 압축할 수 있음, doc/game-management.md "게임 압축" 참고).
+    /// 저장하지 않는 런타임 전용 상태.</summary>
+    [JsonIgnore]
+    public bool IsBusy
+    {
+        get => _isBusy;
+        set
+        {
+            if (_isBusy != value)
+            {
+                _isBusy = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsRunButtonEnabled));
+                OnPropertyChanged(nameof(CanCompress));
+            }
+        }
+    }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

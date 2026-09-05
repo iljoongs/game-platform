@@ -1,0 +1,19 @@
+<Window x:Class="GamePlatform.SelectExecutableWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="실행 파일 선택" Height="420" Width="520"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <TextBlock DockPanel.Dock="Top" TextWrapping="Wrap" Margin="0,0,0,8"
+                   Text="실행 파일(exe)이 여러 개 있습니다. 이 게임을 실행할 파일을 선택하세요."/>
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="확인" Width="80" Margin="0,0,8,0" Click="Ok_Click" IsDefault="True"/>
+            <Button Content="취소" Width="80" Click="Cancel_Click" IsCancel="True"/>
+        </StackPanel>
+        <ListBox x:Name="CandidatesListBox" MouseDoubleClick="CandidatesListBox_MouseDoubleClick"/>
+    </DockPanel>
+</Window>
