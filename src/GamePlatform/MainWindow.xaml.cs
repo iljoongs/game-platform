@@ -993,10 +993,10 @@ public partial class MainWindow : Window
 
         try
         {
-            if (!string.IsNullOrEmpty(item.ThumbnailPath) && File.Exists(item.ThumbnailPath))
-            {
-                File.Delete(item.ThumbnailPath);
-            }
+            // 참조된 파일 하나만이 아니라 "cover.original.*" 전부를 지운다 — 확장자가 바뀐 적이 있었다면
+            // (예: png → jpg) 더 이상 참조되지 않는 옛 파일이 남아 있을 수 있으므로, 새 썸네일을 저장할 때
+            // 쓰는 것과 같은 정리 로직(DeleteExistingCoverFiles)을 그대로 재사용한다.
+            DeleteExistingCoverFiles(AppPaths.GameImagesDir(item.Id));
         }
         catch
         {
