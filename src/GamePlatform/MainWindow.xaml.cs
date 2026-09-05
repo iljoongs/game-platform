@@ -28,6 +28,11 @@ public partial class MainWindow : Window
         GameCardSizeSettings.Current.Apply(preset);
         (preset == GameCardSize.Small ? SmallSizeRadio : LargeSizeRadio).IsChecked = true;
 
+        var screenshotPreset = Enum.TryParse<GameScreenshotSize>(_settings.ScreenshotSizePreset, out var parsedScreenshotPreset)
+            ? parsedScreenshotPreset
+            : GameScreenshotSize.Large;
+        GameScreenshotSizeSettings.Current.Apply(screenshotPreset);
+
         _games = new ObservableCollection<GameItem>(GameLibraryRepository.Load());
         foreach (var game in _games)
         {
@@ -108,7 +113,7 @@ public partial class MainWindow : Window
         };
         item.RefreshExecutableValid();
         _games.Add(item);
-        SaveGames();
+        SaveState();
     }
 
     private void Card_DragOver(object sender, DragEventArgs e)
@@ -154,7 +159,7 @@ public partial class MainWindow : Window
             var result = ThumbnailHelper.CreateThumbnail(sourceImagePath, destDir, "cover");
             item.ThumbnailPath = result.ThumbnailPath;
             item.ThumbnailOriginalPath = result.OriginalPath;
-            SaveGames();
+            SaveState();
         }
         catch (Exception ex)
         {
@@ -184,7 +189,7 @@ public partial class MainWindow : Window
             // 이미지 폴더 삭제 실패는 무시한다 — 목록에서는 이미 제거되었다.
         }
 
-        SaveGames();
+        SaveState();
     }
 
     private void InfoButton_Click(object sender, RoutedEventArgs e)
@@ -194,7 +199,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        SingleInstanceWindow<GameInfoWindow>.Show(new GameInfoWindow(item, SaveGames) { Owner = this });
+        SingleInstanceWindow<GameInfoWindow>.Show(new GameInfoWindow(item, _games, _settings, SaveState) { Owner = this });
     }
 
     private void RunButton_Click(object sender, RoutedEventArgs e)
@@ -225,9 +230,12 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SaveGames()
+    /// <summary>게임 목록과 설정을 함께 저장한다. GameInfoWindow에서 이름/버전/실행파일/게임 요약/
+    /// 이미지 크기 설정 등 무엇이 바뀌든 이 하나의 콜백으로 저장을 위임받는다.</summary>
+    private void SaveState()
     {
         GameLibraryRepository.Save(_games);
+        SettingsRepository.Save(_settings);
         BackupService.CheckAndBackup(_settings);
     }
 }

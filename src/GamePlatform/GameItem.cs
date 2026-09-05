@@ -24,14 +24,19 @@ public class GameItem : INotifyPropertyChanged
     public string Name
     {
         get => _name;
-        set { if (_name != value) { _name = value; OnPropertyChanged(); } }
+        set { if (_name != value) { _name = value; OnPropertyChanged(); OnPropertyChanged(nameof(DisplayName)); } }
     }
 
     public string Version
     {
         get => _version;
-        set { if (_version != value) { _version = value; OnPropertyChanged(); } }
+        set { if (_version != value) { _version = value; OnPropertyChanged(); OnPropertyChanged(nameof(DisplayName)); } }
     }
+
+    /// <summary>화면에 표시할 이름. 같은 이름의 다른 버전을 구분할 수 있도록 "이름-버전" 형식을 쓴다
+    /// (버전이 비어 있으면 이름만). 메인 화면 카드/정보 창 제목 등 게임을 식별해서 보여주는 모든 곳에서 사용한다.</summary>
+    [JsonIgnore]
+    public string DisplayName => string.IsNullOrWhiteSpace(Version) ? Name : $"{Name}-{Version}";
 
     public string Description
     {

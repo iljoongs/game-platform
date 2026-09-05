@@ -28,6 +28,9 @@
                 <TextBox x:Name="ExecutablePathTextBox" IsReadOnly="True"/>
             </DockPanel>
 
+            <Button Content="이름이 같은 모든 버전에 게임 내용/게임 요약 통합" HorizontalAlignment="Left"
+                    Margin="0,0,0,10" Click="MergeVersions_Click"/>
+
             <TextBlock Text="게임 내용"/>
             <TextBox x:Name="DescriptionTextBox" AcceptsReturn="True" TextWrapping="Wrap"
                      Height="140" VerticalScrollBarVisibility="Auto"
@@ -35,6 +38,15 @@
 
             <TextBlock Text="게임 요약 (이 창에 이미지를 끌어다 놓으면 추가됩니다. 클릭하면 원본 크기로 봅니다. 우클릭으로 삭제)"
                        TextWrapping="Wrap"/>
+            <StackPanel Orientation="Horizontal" Margin="0,6,0,4">
+                <TextBlock Text="이미지 크기:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <RadioButton x:Name="ScreenshotLargeRadio" GroupName="ScreenshotSize" Content="320x240"
+                             Checked="ScreenshotLargeRadio_Checked" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <RadioButton x:Name="ScreenshotMediumRadio" GroupName="ScreenshotSize" Content="160x120"
+                             Checked="ScreenshotMediumRadio_Checked" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <RadioButton x:Name="ScreenshotSmallRadio" GroupName="ScreenshotSize" Content="80x60"
+                             Checked="ScreenshotSmallRadio_Checked" VerticalAlignment="Center"/>
+            </StackPanel>
             <ItemsControl x:Name="ScreenshotsItemsControl" Margin="0,4,0,0">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -51,7 +63,9 @@
                                 </ContextMenu>
                             </Border.ContextMenu>
                             <Image Source="{Binding Path, Converter={StaticResource ThumbnailPathConverter}}"
-                                   Width="320" Height="240" Stretch="Uniform"/>
+                                   Width="{Binding Source={x:Static local:GameScreenshotSizeSettings.Current}, Path=Width}"
+                                   Height="{Binding Source={x:Static local:GameScreenshotSizeSettings.Current}, Path=Height}"
+                                   Stretch="Uniform"/>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

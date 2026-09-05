@@ -8,6 +8,9 @@ public class AppSettings
     /// <summary><see cref="GameCardSize"/> enum 이름 문자열 (예: "Large"/"Small").</summary>
     public string CardSizePreset { get; set; } = nameof(GameCardSize.Large);
 
+    /// <summary><see cref="GameScreenshotSize"/> enum 이름 문자열 (예: "Large"/"Medium"/"Small") — 정보 창 게임 요약 갤러리 이미지 크기.</summary>
+    public string ScreenshotSizePreset { get; set; } = nameof(GameScreenshotSize.Large);
+
     public double? MainWindowWidth { get; set; }
     public double? MainWindowHeight { get; set; }
     public double? MainWindowLeft { get; set; }
