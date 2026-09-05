@@ -13,6 +13,7 @@
         Closing="MainWindow_Closing">
     <Window.Resources>
         <local:ThumbnailPathConverter x:Key="ThumbnailPathConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibleConverter"/>
     </Window.Resources>
     <DockPanel>
         <ToolBarTray DockPanel.Dock="Top">
@@ -25,7 +26,7 @@
             </ToolBar>
         </ToolBarTray>
         <TextBlock DockPanel.Dock="Bottom" Margin="8" Foreground="Gray"
-                   Text="실행 파일(exe)을 이 창에 끌어다 놓으면 새 게임이 추가됩니다. 카드에 이미지를 끌어다 놓으면 대표 썸네일이 지정됩니다. 카드 우클릭으로 삭제할 수 있습니다."/>
+                   Text="실행 파일(exe)을 이 창에 끌어다 놓으면 새 게임이 추가됩니다. 카드에 이미지를 끌어다 놓으면 대표 썸네일이 지정됩니다. 카드 우클릭으로 삭제/압축할 수 있습니다."/>
         <ScrollViewer VerticalScrollBarVisibility="Auto">
             <ItemsControl x:Name="GamesItemsControl">
                 <ItemsControl.ItemsPanel>
@@ -42,6 +43,8 @@
                                 Drop="Card_Drop">
                             <Border.ContextMenu>
                                 <ContextMenu>
+                                    <MenuItem Header="압축" Click="CompressGame_Click"
+                                              Visibility="{Binding CanCompress, Converter={StaticResource BoolToVisibleConverter}}"/>
                                     <MenuItem Header="삭제" Click="DeleteGame_Click"/>
                                 </ContextMenu>
                             </Border.ContextMenu>
@@ -54,8 +57,8 @@
                                            TextTrimming="CharacterEllipsis" TextAlignment="Center"/>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <Button Content="정보" Width="60" Margin="4" Click="InfoButton_Click"/>
-                                    <Button Content="실행" Width="60" Margin="4" Click="RunButton_Click"
-                                            IsEnabled="{Binding IsExecutableValid}"/>
+                                    <Button Content="{Binding RunButtonLabel}" Width="70" Margin="4" Click="RunOrExtractButton_Click"
+                                            IsEnabled="{Binding IsRunButtonEnabled}"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

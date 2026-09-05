@@ -17,6 +17,11 @@ public class GameItem : INotifyPropertyChanged
     private string? _executablePath;
     private string? _thumbnailPath;
     private bool _isExecutableValid;
+    private bool _isCompressed;
+    private string? _archivePath;
+    private long _archiveSizeBytes;
+    private DateTime? _compressedAtUtc;
+    private bool _isArchiveValid;
 
     /// <summary>고유 식별자. 이미지 저장 폴더명(<see cref="AppPaths.GameImagesDir"/>)으로 쓰인다.</summary>
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -79,11 +84,79 @@ public class GameItem : INotifyPropertyChanged
     public bool IsExecutableValid
     {
         get => _isExecutableValid;
-        private set { if (_isExecutableValid != value) { _isExecutableValid = value; OnPropertyChanged(); } }
+        private set { if (_isExecutableValid != value) { _isExecutableValid = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsRunButtonEnabled)); } }
     }
 
     public void RefreshExecutableValid() =>
         IsExecutableValid = !string.IsNullOrEmpty(ExecutablePath) && File.Exists(ExecutablePath);
+
+    /// <summary>이 게임이 지금 압축된(원본 폴더는 지워지고 zip으로만 존재하는) 상태인지 여부 —
+    /// doc/game-management.md "게임 압축" 참고. 압축 중에는 <see cref="ExecutablePath"/> 파일이 실제로
+    /// 존재하지 않으므로 <see cref="IsExecutableValid"/>는 자연히 false가 된다.</summary>
+    public bool IsCompressed
+    {
+        get => _isCompressed;
+        set
+        {
+            if (_isCompressed != value)
+            {
+                _isCompressed = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(RunButtonLabel));
+                OnPropertyChanged(nameof(IsRunButtonEnabled));
+                OnPropertyChanged(nameof(CanCompress));
+            }
+        }
+    }
+
+    /// <summary>압축 파일(zip) 경로. 압축 상태가 아니면 null (<see cref="AppPaths.GameArchivePath"/>에 저장됨).</summary>
+    public string? ArchivePath
+    {
+        get => _archivePath;
+        set { if (_archivePath != value) { _archivePath = value; OnPropertyChanged(); } }
+    }
+
+    /// <summary>압축 파일 크기(바이트). 정보 창의 압축 정보 표시용.</summary>
+    public long ArchiveSizeBytes
+    {
+        get => _archiveSizeBytes;
+        set { if (_archiveSizeBytes != value) { _archiveSizeBytes = value; OnPropertyChanged(); OnPropertyChanged(nameof(ArchiveSizeDisplay)); } }
+    }
+
+    /// <summary>압축을 수행한 시각(UTC). 정보 창의 압축 정보 표시용.</summary>
+    public DateTime? CompressedAtUtc
+    {
+        get => _compressedAtUtc;
+        set { if (_compressedAtUtc != value) { _compressedAtUtc = value; OnPropertyChanged(); } }
+    }
+
+    [JsonIgnore]
+    public string ArchiveSizeDisplay => ArchiveSizeBytes <= 0 ? string.Empty : $"{ArchiveSizeBytes / 1024.0 / 1024.0:N1} MB";
+
+    /// <summary><see cref="ArchivePath"/>가 실제로 존재하는지 여부. JSON에는 저장하지 않고, 앱 시작 시/
+    /// 압축·압축 해제 시 <see cref="RefreshArchiveValid"/>로 다시 계산한다.</summary>
+    [JsonIgnore]
+    public bool IsArchiveValid
+    {
+        get => _isArchiveValid;
+        private set { if (_isArchiveValid != value) { _isArchiveValid = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsRunButtonEnabled)); } }
+    }
+
+    public void RefreshArchiveValid() =>
+        IsArchiveValid = IsCompressed && !string.IsNullOrEmpty(ArchivePath) && File.Exists(ArchivePath);
+
+    /// <summary>메인 카드 두 번째 버튼의 표시 문구. 압축 상태면 "압축 풀기", 아니면 "실행".</summary>
+    [JsonIgnore]
+    public string RunButtonLabel => IsCompressed ? "압축 풀기" : "실행";
+
+    /// <summary>메인 카드 두 번째 버튼의 활성화 여부. 압축 상태면 압축 파일이 있어야, 아니면 실행 파일이 있어야 활성화된다.</summary>
+    [JsonIgnore]
+    public bool IsRunButtonEnabled => IsCompressed ? IsArchiveValid : IsExecutableValid;
+
+    /// <summary>카드 우클릭 메뉴의 "압축" 항목을 보여줄지 여부 — 이미 압축된 게임은 다시 압축할 수 없다
+    /// (압축을 풀려면 카드의 압축 풀기 버튼을 쓴다).</summary>
+    [JsonIgnore]
+    public bool CanCompress => !IsCompressed;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 

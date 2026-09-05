@@ -30,6 +30,11 @@
                 <TextBox x:Name="ExecutablePathTextBox" IsReadOnly="True"/>
             </DockPanel>
 
+            <StackPanel x:Name="ArchiveInfoPanel" Margin="0,0,0,10" Visibility="Collapsed">
+                <TextBlock Text="압축 정보"/>
+                <TextBlock x:Name="ArchiveInfoTextBlock" TextWrapping="Wrap" Foreground="Gray" Margin="0,2,0,0"/>
+            </StackPanel>
+
             <Button Content="이름이 같은 모든 버전에 게임 내용/게임 요약 통합" HorizontalAlignment="Left"
                     Margin="0,0,0,10" Click="MergeVersions_Click"/>
 

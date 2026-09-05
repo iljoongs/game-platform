@@ -21,12 +21,17 @@ video-vault의 `AppPaths` 패턴을 따라 `%LOCALAPPDATA%\GamePlatform\` 아래
 
 ```
 %LOCALAPPDATA%\GamePlatform\
-├── games.json          # 게임 목록 (GameItem 배열)
-├── settings.json        # 카드 크기 등 전역 설정
-└── images\
-    └── {게임 Id}\
-        ├── thumbnail.jpg / thumbnail.original.*   # 대표 썸네일
-        └── screenshot-{n}.jpg / screenshot-{n}.original.*  # 게임 요약 캡처
+├── games.json                 # 게임 목록 (GameItem 배열)
+├── settings.json              # 카드 크기 등 전역 설정
+├── backup\
+│   ├── games.daily.json
+│   └── games.weekly.json
+├── images\
+│   └── {게임 Id}\
+│       ├── cover.original.*            # 대표 썸네일 (원본 크기 그대로)
+│       └── screenshot-{guid}.original.*  # 게임 요약 캡처 (각각 원본 크기 그대로)
+└── archives\
+    └── {게임 Id}.zip           # 압축된 게임 (게임 폴더 전체) — doc/game-management.md "게임 압축" 참고
 ```
 
 게임의 실행 파일(exe)은 사용자가 이미 설치해 둔 임의의 위치(다른 드라이브, 읽기 전용 폴더 등)를 가리킬 수 있으므로, video-vault처럼 원본 파일과 같은 폴더에 썸네일을 저장하지 않고 앱 데이터 폴더 안에 게임 Id별로 모아 저장한다.

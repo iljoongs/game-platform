@@ -39,6 +39,7 @@ public partial class GameInfoWindow : Window
         ExecutablePathTextBox.Text = item.ExecutablePath;
         ScreenshotsItemsControl.ItemsSource = _gallery;
         RefreshGallery();
+        RefreshArchiveInfo();
         _item.PropertyChanged += Item_PropertyChanged;
         UpdateTitle();
 
@@ -59,13 +60,33 @@ public partial class GameInfoWindow : Window
 
     private void UpdateTitle() => Title = $"게임 정보 - {_item.DisplayName}";
 
-    /// <summary>메인 화면에서 대표 썸네일을 바꾸면(같은 게임을 이 창을 열어둔 채로) 갤러리 첫 슬롯도 즉시 따라간다.</summary>
+    /// <summary>메인 화면에서 대표 썸네일을 바꾸거나(같은 게임을 이 창을 열어둔 채로) 카드 우클릭 메뉴로
+    /// 압축/압축 풀기를 하면, 이 창이 열려 있어도 갤러리 첫 슬롯과 압축 정보가 즉시 따라간다.</summary>
     private void Item_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(GameItem.ThumbnailPath))
         {
             RefreshGallery();
         }
+
+        if (e.PropertyName is nameof(GameItem.IsCompressed) or nameof(GameItem.ArchivePath)
+            or nameof(GameItem.ArchiveSizeDisplay) or nameof(GameItem.CompressedAtUtc))
+        {
+            RefreshArchiveInfo();
+        }
+    }
+
+    /// <summary>압축 정보 패널을 갱신한다 — 압축 상태가 아니면 패널 자체를 숨긴다 (doc/game-management.md "게임 압축" 참고).</summary>
+    private void RefreshArchiveInfo()
+    {
+        ArchiveInfoPanel.Visibility = _item.IsCompressed ? Visibility.Visible : Visibility.Collapsed;
+        if (!_item.IsCompressed)
+        {
+            return;
+        }
+
+        var compressedAt = _item.CompressedAtUtc?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "알 수 없음";
+        ArchiveInfoTextBlock.Text = $"압축 파일: {_item.ArchivePath}\n크기: {_item.ArchiveSizeDisplay}\n압축 일시: {compressedAt}";
     }
 
     /// <summary>갤러리를 [대표 썸네일 슬롯] + [게임 요약 스크린샷들]로 다시 채운다. 대표 썸네일이 없어도

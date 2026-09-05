@@ -28,7 +28,14 @@ public static class AppPaths
     /// <summary>게임 하나의 이미지(대표 썸네일/게임 요약 캡처)를 저장하는 폴더.</summary>
     public static string GameImagesDir(string gameId) => Path.Combine(ImagesDir, gameId);
 
+    private static string ArchivesDir => Path.Combine(AppDataDir, "archives");
+
+    /// <summary>게임 하나를 통째로 압축한 zip 파일 경로 — doc/game-management.md "게임 압축" 참고.</summary>
+    public static string GameArchivePath(string gameId) => Path.Combine(ArchivesDir, $"{gameId}.zip");
+
     public static void EnsureAppDataDirectory() => Directory.CreateDirectory(AppDataDir);
 
     public static void EnsureBackupDirectory() => Directory.CreateDirectory(BackupDir);
+
+    public static void EnsureArchivesDirectory() => Directory.CreateDirectory(ArchivesDir);
 }

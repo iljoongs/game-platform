@@ -2,8 +2,10 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 
 namespace GamePlatform;
 
@@ -37,6 +39,7 @@ public partial class MainWindow : Window
         foreach (var game in _games)
         {
             game.RefreshExecutableValid();
+            game.RefreshArchiveValid();
         }
         GamesItemsControl.ItemsSource = _games;
 
@@ -181,10 +184,15 @@ public partial class MainWindow : Window
             {
                 Directory.Delete(dir, recursive: true);
             }
+
+            if (item.IsCompressed && !string.IsNullOrEmpty(item.ArchivePath) && File.Exists(item.ArchivePath))
+            {
+                File.Delete(item.ArchivePath);
+            }
         }
         catch
         {
-            // 이미지 폴더 삭제 실패는 무시한다 — 목록에서는 이미 제거되었다.
+            // 이미지 폴더/압축 파일 삭제 실패는 무시한다 — 목록에서는 이미 제거되었다.
         }
 
         SaveState();
@@ -200,13 +208,25 @@ public partial class MainWindow : Window
         SingleInstanceWindow<GameInfoWindow>.Show(new GameInfoWindow(item, _games, _settings, SaveState) { Owner = this });
     }
 
-    private void RunButton_Click(object sender, RoutedEventArgs e)
+    private void RunOrExtractButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: GameItem item })
         {
             return;
         }
 
+        if (item.IsCompressed)
+        {
+            ExtractGame(item);
+        }
+        else
+        {
+            RunGame(item);
+        }
+    }
+
+    private void RunGame(GameItem item)
+    {
         if (string.IsNullOrEmpty(item.ExecutablePath) || !File.Exists(item.ExecutablePath))
         {
             item.RefreshExecutableValid();
@@ -225,6 +245,111 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             MessageBox.Show(this, $"게임을 실행하지 못했습니다.\n{ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    /// <summary>카드 우클릭 메뉴의 "압축" — 실행 파일이 있는 폴더 전체를 zip으로 묶어 앱 데이터 폴더에 저장하고,
+    /// 원본 폴더는 삭제해 디스크 공간을 확보한다 (doc/game-management.md "게임 압축" 참고). 되돌리려면
+    /// 카드의 "압축 풀기" 버튼을 쓴다.</summary>
+    private void CompressGame_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: GameItem item } || item.IsCompressed)
+        {
+            return;
+        }
+
+        if (string.IsNullOrEmpty(item.ExecutablePath))
+        {
+            MessageBox.Show(this, "실행 파일이 지정되지 않아 압축할 수 없습니다. 정보 창에서 먼저 지정하세요.",
+                "압축", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var gameDir = Path.GetDirectoryName(item.ExecutablePath);
+        if (string.IsNullOrEmpty(gameDir) || !Directory.Exists(gameDir))
+        {
+            MessageBox.Show(this, "게임 폴더를 찾을 수 없어 압축할 수 없습니다.", "압축", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var confirm = MessageBox.Show(this,
+            $"'{gameDir}' 폴더 전체를 압축하고 원본 폴더는 삭제합니다.\n계속할까요?",
+            "게임 압축", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        Mouse.OverrideCursor = Cursors.Wait;
+        try
+        {
+            AppPaths.EnsureArchivesDirectory();
+            var archivePath = AppPaths.GameArchivePath(item.Id);
+            if (File.Exists(archivePath))
+            {
+                File.Delete(archivePath);
+            }
+
+            ZipFile.CreateFromDirectory(gameDir, archivePath, CompressionLevel.Optimal, includeBaseDirectory: false);
+            Directory.Delete(gameDir, recursive: true);
+
+            item.ArchivePath = archivePath;
+            item.ArchiveSizeBytes = new FileInfo(archivePath).Length;
+            item.CompressedAtUtc = DateTime.UtcNow;
+            item.IsCompressed = true;
+            item.RefreshExecutableValid();
+            item.RefreshArchiveValid();
+            SaveState();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"압축하지 못했습니다.\n{ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
+        }
+    }
+
+    /// <summary>카드의 "압축 풀기" 버튼 — 압축 파일을 원래 게임 폴더 위치에 풀고 압축 파일은 지운다.</summary>
+    private void ExtractGame(GameItem item)
+    {
+        if (string.IsNullOrEmpty(item.ArchivePath) || !File.Exists(item.ArchivePath))
+        {
+            item.RefreshArchiveValid();
+            MessageBox.Show(this, "압축 파일을 찾을 수 없습니다.", "압축 풀기", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var gameDir = string.IsNullOrEmpty(item.ExecutablePath) ? null : Path.GetDirectoryName(item.ExecutablePath);
+        if (string.IsNullOrEmpty(gameDir))
+        {
+            MessageBox.Show(this, "압축을 풀 폴더 위치를 알 수 없습니다.", "압축 풀기", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        Mouse.OverrideCursor = Cursors.Wait;
+        try
+        {
+            Directory.CreateDirectory(gameDir);
+            ZipFile.ExtractToDirectory(item.ArchivePath, gameDir, overwriteFiles: true);
+            File.Delete(item.ArchivePath);
+
+            item.IsCompressed = false;
+            item.ArchivePath = null;
+            item.ArchiveSizeBytes = 0;
+            item.CompressedAtUtc = null;
+            item.RefreshExecutableValid();
+            item.RefreshArchiveValid();
+            SaveState();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"압축을 풀지 못했습니다.\n{ex.Message}", "오류", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
         }
     }
 
