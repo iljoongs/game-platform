@@ -5,7 +5,7 @@
 이 문서는 상위 폴더의 형제 프로젝트(`image-readers`, `text-readers`, `english-training`, `video-vault`)들이 공통으로 따르는 지시서 구조와 작업 원칙을 뽑아 정리한 것입니다. 프로젝트별 세부 내용(프로젝트 한 줄 요약, 기술 스택 상세, doc/ 목록 등)은 아래 표를 채워 넣어 확장하세요.
 
 ## 프로젝트 한 줄 요약
-_(TODO: 이 프로젝트가 무엇을 하는지 한 줄로 작성)_
+썸네일 카드로 게임을 관리하고, 카드에서 바로 정보를 확인하거나 지정한 실행 파일을 실행하는 WPF 데스크톱 런처.
 
 ## 기술 스택
 형제 프로젝트들의 공통 스택(참고용, 이 프로젝트 성격에 맞게 조정):
@@ -19,23 +19,21 @@ _(TODO: 이 프로젝트가 무엇을 하는지 한 줄로 작성)_
 ```
 game-platform/
 ├── CLAUDE.md          # 메인 지시서 (이 파일)
-├── <project>.sln
+├── game-platform.sln
 ├── .gitignore
-├── data/ 또는 .data/  # 런타임 데이터 (JSON 등)
-├── doc/               # 기능별 상세 보조 지시서
+├── doc/               # 기능별 상세 보조 지시서 (게임 목록/썸네일/설정 데이터는 %LOCALAPPDATA%\GamePlatform\ 사용 — doc/common-management.md 참고)
 └── src/
-    └── <ProjectName>/ # 앱 본체 소스
+    └── GamePlatform/  # 앱 본체 소스 (아직 미구현)
 ```
 
 ## 보조 지시서 목록 (doc/ 폴더)
 
-작업 성격에 맞는 문서를 참조하세요. _(TODO: 아래는 예시 형식 — 실제 doc/ 파일이 생기면 표를 채운다)_
+작업 성격에 맞는 문서를 참조하세요.
 
 | 문서 | 내용 |
 |---|---|
-| [doc/01-overview.md](doc/01-overview.md) | 프로젝트 개요, 목표, 범위 |
-| [doc/02-architecture.md](doc/02-architecture.md) | 프로젝트 구조, MVVM 설계, 폴더/네임스페이스 구성 |
-| [doc/coding-convention.md](doc/coding-convention.md) | 네이밍, 계층 책임, 데이터 저장·파싱 규칙, 테스트/커밋 컨벤션 |
+| [doc/game-management.md](doc/game-management.md) | 게임 카드 목록(메인 화면), 카드 추가/삭제, 대표 썸네일, 실행, 정보 창(`GameInfoWindow`), `GameItem` 데이터 모델 |
+| [doc/common-management.md](doc/common-management.md) | 저장 경로(`AppPaths`), 설정 저장, video-vault에서 이식하는 썸네일/드래그앤드롭 공용 인프라, 오류 처리 |
 
 ## 작업 원칙
 
