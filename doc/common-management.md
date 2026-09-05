@@ -10,7 +10,7 @@
 
 - **`ImageLoadHelper`**: 로컬 파일 경로에서 `BitmapImage`를 `BitmapCacheOption.OnLoad` + `IgnoreImageCache`로 즉시 전부 읽어들여 `Freeze()`한다. 같은 경로에 썸네일을 덮어쓸 때 "파일이 사용 중" 오류가 나거나, 덮어썼는데도 화면에 예전 이미지가 남는 문제를 막기 위한 것 — 로컬 파일 경로로 이미지를 표시하는 모든 코드는 이 헬퍼(또는 아래 컨버터)를 거친다.
 - **`ThumbnailPathConverter`**: XAML에서 `Image.Source`를 문자열 경로에 바인딩할 때 `ImageLoadHelper.Load`를 거치도록 하는 `IValueConverter`.
-- **`ThumbnailHelper`**: 이미지를 원본과 리사이즈본(320x240 이내, 가로세로 비율 유지) 두 파일로 저장하고, 소스로 쓰인 임시 파일은 정리한다.
+- **`ThumbnailHelper`**: `CreateThumbnail`은 이미지를 원본과 리사이즈본(320x240 이내, 가로세로 비율 유지) 두 파일로 저장하고 소스로 쓰인 임시 파일은 정리한다 — 게임 요약 스크린샷처럼 여러 장을 반복 표시하는 곳에 쓴다. `CopyOriginal`은 리사이즈 없이 원본 크기 그대로 한 파일만 저장한다 — 메인 카드 대표 썸네일처럼 한 장뿐이고 화면에서 스케일해서 보여주면 충분한 곳에 쓴다.
 - **`DragDropImageHelper`**: 드래그앤드롭된 데이터에서 이미지를 꺼내 파일로 확보한다. 로컬 파일뿐 아니라 브라우저에서 드래그한 이미지(웹 URL/`data:` URI/렌더링된 비트맵)도 지원한다.
 - **`OriginalImageWindow`**: 리사이즈 전 원본 이미지를 크게 보여주고, 아무 곳이나 클릭하면 닫힌다. [게임 관리](game-management.md)의 게임 요약 갤러리 항목 클릭 시 사용.
 - **`SingleInstanceWindow<T>`**: 창 종류(T)별로 현재 열려 있는 인스턴스를 추적해, 같은 종류의 새 창을 열면 기존 창을 먼저 닫는다. [게임 관리](game-management.md)의 `GameInfoWindow`(한 번에 하나만 열림)에 사용.

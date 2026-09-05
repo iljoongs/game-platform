@@ -50,7 +50,8 @@ public class GameItem : INotifyPropertyChanged
         set { if (_executablePath != value) { _executablePath = value; OnPropertyChanged(); } }
     }
 
-    /// <summary>메인 카드 대표 썸네일(320x240 이내 리사이즈본) 경로.</summary>
+    /// <summary>메인 카드 대표 썸네일 경로. 원본 크기 그대로 저장하고, 화면에는 스케일해서 보여준다
+    /// (doc/game-management.md "대표 썸네일 지정" 참고 — 별도의 리사이즈본을 만들지 않는다).</summary>
     public string? ThumbnailPath
     {
         get => _thumbnailPath;
@@ -64,9 +65,6 @@ public class GameItem : INotifyPropertyChanged
             }
         }
     }
-
-    /// <summary>대표 썸네일의 리사이즈 전 원본 경로.</summary>
-    public string? ThumbnailOriginalPath { get; set; }
 
     /// <summary>게임 요약 갤러리용 캡처 이미지 목록.</summary>
     [JsonInclude]
@@ -98,4 +96,14 @@ public class ScreenshotItem
 {
     public string Path { get; set; } = string.Empty;
     public string OriginalPath { get; set; } = string.Empty;
+
+    /// <summary>실제 저장된 스크린샷이 아니라, 갤러리 맨 앞에 표시하는 "메인 화면 대표 썸네일" 슬롯이면 true
+    /// (GameInfoWindow가 표시 목적으로만 만드는 값 — <see cref="GameItem.Screenshots"/>에는 절대 들어가지 않으므로
+    /// 저장할 필요가 없다). doc/game-management.md "게임 요약 첫 번째 슬롯" 참고.</summary>
+    [JsonIgnore]
+    public bool IsCover { get; init; }
+
+    /// <summary>우클릭 삭제 메뉴를 보여줄지 여부 — 대표 썸네일 슬롯(<see cref="IsCover"/>)은 여기서 지울 수 없다.</summary>
+    [JsonIgnore]
+    public bool IsDeletable => !IsCover;
 }

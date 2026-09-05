@@ -1,3 +1,5 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -18,6 +20,10 @@ public partial class GameInfoWindow : Window
     private readonly Action _onChanged;
     private readonly bool _isLoading;
 
+    /// <summary>게임 요약 갤러리에 실제로 보여주는 목록. 맨 앞에 메인 화면 대표 썸네일(<see cref="ScreenshotItem.IsCover"/>)을
+    /// 얹고 그 뒤에 <see cref="GameItem.Screenshots"/>를 이어붙인 것 — <see cref="RefreshGallery"/>로 다시 만든다.</summary>
+    private readonly ObservableCollection<ScreenshotItem> _gallery = new();
+
     public GameInfoWindow(GameItem item, IEnumerable<GameItem> allGames, AppSettings settings, Action onChanged)
     {
         InitializeComponent();
@@ -31,7 +37,9 @@ public partial class GameInfoWindow : Window
         VersionTextBox.Text = item.Version;
         DescriptionTextBox.Text = item.Description;
         ExecutablePathTextBox.Text = item.ExecutablePath;
-        ScreenshotsItemsControl.ItemsSource = item.Screenshots;
+        ScreenshotsItemsControl.ItemsSource = _gallery;
+        RefreshGallery();
+        _item.PropertyChanged += Item_PropertyChanged;
         UpdateTitle();
 
         (GameScreenshotSizeSettings.Current.Preset switch
@@ -50,6 +58,33 @@ public partial class GameInfoWindow : Window
     }
 
     private void UpdateTitle() => Title = $"게임 정보 - {_item.DisplayName}";
+
+    /// <summary>메인 화면에서 대표 썸네일을 바꾸면(같은 게임을 이 창을 열어둔 채로) 갤러리 첫 슬롯도 즉시 따라간다.</summary>
+    private void Item_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(GameItem.ThumbnailPath))
+        {
+            RefreshGallery();
+        }
+    }
+
+    /// <summary>갤러리를 [대표 썸네일 슬롯] + [게임 요약 스크린샷들]로 다시 채운다. 대표 썸네일이 없어도
+    /// 슬롯 자체는 항상 보여주고(빈 이미지 placeholder), 삭제 대상이 아니므로 <see cref="ScreenshotItem.IsCover"/>로 표시한다.</summary>
+    private void RefreshGallery()
+    {
+        _gallery.Clear();
+        _gallery.Add(new ScreenshotItem
+        {
+            Path = _item.ThumbnailPath ?? string.Empty,
+            OriginalPath = _item.ThumbnailPath ?? string.Empty,
+            IsCover = true,
+        });
+
+        foreach (var screenshot in _item.Screenshots)
+        {
+            _gallery.Add(screenshot);
+        }
+    }
 
     private void NameTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
@@ -113,6 +148,7 @@ public partial class GameInfoWindow : Window
             var baseName = $"screenshot-{Guid.NewGuid():N}";
             var result = ThumbnailHelper.CreateThumbnail(imagePath, destDir, baseName);
             _item.Screenshots.Add(new ScreenshotItem { Path = result.ThumbnailPath, OriginalPath = result.OriginalPath });
+            RefreshGallery();
             _onChanged();
         }
         catch (Exception ex)
@@ -135,13 +171,14 @@ public partial class GameInfoWindow : Window
 
     private void DeleteScreenshot_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not FrameworkElement { DataContext: ScreenshotItem screenshot })
+        if (sender is not FrameworkElement { DataContext: ScreenshotItem screenshot } || screenshot.IsCover)
         {
             return;
         }
 
         _item.Screenshots.Remove(screenshot);
         DeleteScreenshotFiles(new[] { screenshot });
+        RefreshGallery();
         _onChanged();
     }
 
@@ -201,8 +238,7 @@ public partial class GameInfoWindow : Window
         }
 
         DescriptionTextBox.Text = _item.Description;
-        ScreenshotsItemsControl.ItemsSource = null;
-        ScreenshotsItemsControl.ItemsSource = _item.Screenshots;
+        RefreshGallery();
 
         _onChanged();
         MessageBox.Show(this, $"이름이 같은 버전 {siblings.Count}개의 게임 내용/게임 요약을 통합했습니다.",
@@ -237,6 +273,9 @@ public partial class GameInfoWindow : Window
         }
     }
 
-    private void GameInfoWindow_Closed(object? sender, EventArgs e) =>
+    private void GameInfoWindow_Closed(object? sender, EventArgs e)
+    {
+        _item.PropertyChanged -= Item_PropertyChanged;
         WindowSizeMemory.Remember(nameof(GameInfoWindow), Width, Height);
+    }
 }

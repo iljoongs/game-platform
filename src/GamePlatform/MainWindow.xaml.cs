@@ -156,9 +156,7 @@ public partial class MainWindow : Window
         try
         {
             var destDir = AppPaths.GameImagesDir(item.Id);
-            var result = ThumbnailHelper.CreateThumbnail(sourceImagePath, destDir, "cover");
-            item.ThumbnailPath = result.ThumbnailPath;
-            item.ThumbnailOriginalPath = result.OriginalPath;
+            item.ThumbnailPath = ThumbnailHelper.CopyOriginal(sourceImagePath, destDir, "cover");
             SaveState();
         }
         catch (Exception ex)

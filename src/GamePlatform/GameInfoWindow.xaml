@@ -13,6 +13,8 @@
         Closed="GameInfoWindow_Closed">
     <Window.Resources>
         <local:ThumbnailPathConverter x:Key="ThumbnailPathConverter"/>
+        <local:EmptyPathToVisibleConverter x:Key="EmptyPathToVisibleConverter"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibleConverter"/>
     </Window.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="12">
@@ -36,7 +38,7 @@
                      Height="140" VerticalScrollBarVisibility="Auto"
                      TextChanged="DescriptionTextBox_TextChanged" Margin="0,2,0,10"/>
 
-            <TextBlock Text="게임 요약 (이 창에 이미지를 끌어다 놓으면 추가됩니다. 클릭하면 원본 크기로 봅니다. 우클릭으로 삭제)"
+            <TextBlock Text="게임 요약 (첫 번째는 메인 화면 대표 썸네일입니다. 이 창에 이미지를 끌어다 놓으면 추가됩니다. 클릭하면 원본 크기로 봅니다. 우클릭으로 삭제)"
                        TextWrapping="Wrap"/>
             <StackPanel Orientation="Horizontal" Margin="0,6,0,4">
                 <TextBlock Text="이미지 크기:" VerticalAlignment="Center" Margin="0,0,6,0"/>
@@ -55,17 +57,27 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border Margin="4" BorderBrush="Gray" BorderThickness="1"
+                        <Border Margin="4" BorderBrush="Gray" BorderThickness="1" Background="Transparent"
                                 MouseLeftButtonUp="Screenshot_Click">
                             <Border.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem Header="삭제" Click="DeleteScreenshot_Click"/>
+                                    <MenuItem Header="삭제" Click="DeleteScreenshot_Click"
+                                              Visibility="{Binding IsDeletable, Converter={StaticResource BoolToVisibleConverter}}"/>
                                 </ContextMenu>
                             </Border.ContextMenu>
-                            <Image Source="{Binding Path, Converter={StaticResource ThumbnailPathConverter}}"
-                                   Width="{Binding Source={x:Static local:GameScreenshotSizeSettings.Current}, Path=Width}"
-                                   Height="{Binding Source={x:Static local:GameScreenshotSizeSettings.Current}, Path=Height}"
-                                   Stretch="Uniform"/>
+                            <Grid Width="{Binding Source={x:Static local:GameScreenshotSizeSettings.Current}, Path=Width}"
+                                  Height="{Binding Source={x:Static local:GameScreenshotSizeSettings.Current}, Path=Height}">
+                                <Border Background="#22000000"
+                                        Visibility="{Binding Path, Converter={StaticResource EmptyPathToVisibleConverter}}">
+                                    <TextBlock Text="썸네일 없음" Foreground="Gray"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <Image Source="{Binding Path, Converter={StaticResource ThumbnailPathConverter}}" Stretch="Uniform"/>
+                                <Border Background="#AA000000" VerticalAlignment="Bottom"
+                                        Visibility="{Binding IsCover, Converter={StaticResource BoolToVisibleConverter}}">
+                                    <TextBlock Text="대표 이미지" Foreground="White" Margin="2" HorizontalAlignment="Center"/>
+                                </Border>
+                            </Grid>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

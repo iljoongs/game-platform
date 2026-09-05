@@ -69,6 +69,36 @@ public static class ThumbnailHelper
         return new Result(thumbnailPath, originalPath);
     }
 
+    /// <summary>
+    /// <paramref name="sourceImagePath"/> 이미지를 리사이즈 없이 원본 크기 그대로 <paramref name="destDir"/>에
+    /// "{baseName}.original{확장자}"로 복사하고, 복사가 끝난 원본은 삭제한다. 메인 화면 카드 대표 썸네일은
+    /// 별도의 리사이즈본을 만들지 않고 이 원본 크기 파일을 그대로 저장해뒀다가 화면에는 스케일해서 보여준다
+    /// (doc/game-management.md "대표 썸네일 지정" 참고) — 여러 장을 반복해서 작게 표시해야 하는 게임 요약
+    /// 갤러리(<see cref="CreateThumbnail"/>)와 달리, 카드 하나당 한 장뿐이라 리사이즈본을 따로 둘 이유가 없다.
+    /// </summary>
+    public static string CopyOriginal(string sourceImagePath, string destDir, string baseName)
+    {
+        Directory.CreateDirectory(destDir);
+
+        var sourceExtension = Path.GetExtension(sourceImagePath);
+        if (string.IsNullOrEmpty(sourceExtension))
+        {
+            sourceExtension = ".jpg";
+        }
+
+        var sourceFullPath = Path.GetFullPath(sourceImagePath);
+        var destPath = Path.Combine(destDir, $"{baseName}.original{sourceExtension}");
+        var isSourceSameAsDest = string.Equals(sourceFullPath, Path.GetFullPath(destPath), StringComparison.OrdinalIgnoreCase);
+
+        if (!isSourceSameAsDest)
+        {
+            File.Copy(sourceImagePath, destPath, overwrite: true);
+            TryDeleteSource(sourceImagePath);
+        }
+
+        return destPath;
+    }
+
     private static void TryDeleteSource(string path)
     {
         try
