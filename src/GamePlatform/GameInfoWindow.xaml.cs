@@ -76,7 +76,6 @@ public partial class GameInfoWindow : Window
         _gallery.Add(new ScreenshotItem
         {
             Path = _item.ThumbnailPath ?? string.Empty,
-            OriginalPath = _item.ThumbnailPath ?? string.Empty,
             IsCover = true,
         });
 
@@ -146,8 +145,8 @@ public partial class GameInfoWindow : Window
         {
             var destDir = AppPaths.GameImagesDir(_item.Id);
             var baseName = $"screenshot-{Guid.NewGuid():N}";
-            var result = ThumbnailHelper.CreateThumbnail(imagePath, destDir, baseName, isTemporary);
-            _item.Screenshots.Add(new ScreenshotItem { Path = result.ThumbnailPath, OriginalPath = result.OriginalPath });
+            var path = ThumbnailHelper.CopyOriginal(imagePath, destDir, baseName, isTemporary);
+            _item.Screenshots.Add(new ScreenshotItem { Path = path });
             RefreshGallery();
             _onChanged();
         }
@@ -166,7 +165,7 @@ public partial class GameInfoWindow : Window
             return;
         }
 
-        OriginalImageWindow.ShowFor(this, screenshot.OriginalPath);
+        OriginalImageWindow.ShowFor(this, screenshot.Path);
     }
 
     private void DeleteScreenshot_Click(object sender, RoutedEventArgs e)
@@ -249,27 +248,18 @@ public partial class GameInfoWindow : Window
         .Where(g => !string.IsNullOrWhiteSpace(g.Description))
         .Select(g => $"[{(string.IsNullOrWhiteSpace(g.Version) ? "버전 미지정" : g.Version)}]\n{g.Description.Trim()}"));
 
-    /// <summary>스크린샷 한 장(원본+리사이즈본)을 다른 게임의 이미지 폴더로 복사한다. 원본 파일은
-    /// 지우지 않는다 — ThumbnailHelper.CreateThumbnail과 달리 이미 저장된 두 파일을 그대로 복제하는 것뿐이다.</summary>
-    private static ScreenshotItem CopyScreenshot(ScreenshotItem source, string destDir)
+    /// <summary>스크린샷 한 장을 다른 게임의 이미지 폴더로 복사한다(원본은 지우지 않음 — 이미 저장된 파일을
+    /// 그대로 복제하는 것뿐이다).</summary>
+    private static ScreenshotItem CopyScreenshot(ScreenshotItem source, string destDir) => new()
     {
-        Directory.CreateDirectory(destDir);
-        var baseName = $"screenshot-{Guid.NewGuid():N}";
-        var destOriginal = Path.Combine(destDir, $"{baseName}.original{Path.GetExtension(source.OriginalPath)}");
-        var destThumbnail = Path.Combine(destDir, $"{baseName}.thumbnail.jpg");
-
-        File.Copy(source.OriginalPath, destOriginal, overwrite: true);
-        File.Copy(source.Path, destThumbnail, overwrite: true);
-
-        return new ScreenshotItem { Path = destThumbnail, OriginalPath = destOriginal };
-    }
+        Path = ThumbnailHelper.CopyOriginal(source.Path, destDir, $"screenshot-{Guid.NewGuid():N}", deleteSource: false),
+    };
 
     private static void DeleteScreenshotFiles(IEnumerable<ScreenshotItem> screenshots)
     {
         foreach (var screenshot in screenshots)
         {
             try { if (File.Exists(screenshot.Path)) File.Delete(screenshot.Path); } catch { }
-            try { if (File.Exists(screenshot.OriginalPath)) File.Delete(screenshot.OriginalPath); } catch { }
         }
     }
 

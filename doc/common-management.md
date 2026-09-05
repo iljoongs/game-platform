@@ -10,7 +10,7 @@
 
 - **`ImageLoadHelper`**: 로컬 파일 경로에서 `BitmapImage`를 `BitmapCacheOption.OnLoad` + `IgnoreImageCache`로 즉시 전부 읽어들여 `Freeze()`한다. 같은 경로에 썸네일을 덮어쓸 때 "파일이 사용 중" 오류가 나거나, 덮어썼는데도 화면에 예전 이미지가 남는 문제를 막기 위한 것 — 로컬 파일 경로로 이미지를 표시하는 모든 코드는 이 헬퍼(또는 아래 컨버터)를 거친다.
 - **`ThumbnailPathConverter`**: XAML에서 `Image.Source`를 문자열 경로에 바인딩할 때 `ImageLoadHelper.Load`를 거치도록 하는 `IValueConverter`.
-- **`ThumbnailHelper`**: `CreateThumbnail`은 이미지를 원본과 리사이즈본(320x240 이내, 가로세로 비율 유지) 두 파일로 저장한다 — 게임 요약 스크린샷처럼 여러 장을 반복 표시하는 곳에 쓴다. `CopyOriginal`은 리사이즈 없이 원본 크기 그대로 한 파일만 저장한다 — 메인 카드 대표 썸네일처럼 한 장뿐이고 화면에서 스케일해서 보여주면 충분한 곳에 쓴다. 둘 다 `deleteSource` 매개변수를 받아, 소스로 쓰인 파일을 지울지 호출자가 명시적으로 결정한다 — 위 `DragDropImageHelper`의 `isTemporary`를 그대로 전달해, 임시 파일만 지우고 사용자가 드래그한 로컬 원본은 그대로 남겨둔다.
+- **`ThumbnailHelper`**: `CopyOriginal`이 이미지를 리사이즈 없이 원본 크기 그대로 한 파일만 저장한다 — 메인 카드 대표 썸네일과 게임 요약 스크린샷 모두 이 방식을 쓰며, 화면에는 항상 표시 크기에 맞게 스케일해서 보여준다(별도의 리사이즈본 파일은 만들지 않는다). `deleteSource` 매개변수를 받아 소스로 쓰인 파일을 지울지 호출자가 명시적으로 결정한다 — 위 `DragDropImageHelper`의 `isTemporary`를 그대로 전달해, 임시 파일만 지우고 사용자가 드래그한 로컬 원본은 그대로 남겨둔다.
 - **`DragDropImageHelper`**: 드래그앤드롭된 데이터에서 이미지를 꺼내 파일로 확보한다. 로컬 파일뿐 아니라 브라우저에서 드래그한 이미지(웹 URL/`data:` URI/렌더링된 비트맵)도 지원한다. `TryGetImagePath`는 반환하는 파일이 이 메서드가 직접 만든 **임시 파일**(웹 다운로드/`data:` URI/비트맵)인지, 사용자의 **로컬 파일 그대로**인지를 `isTemporary` out 매개변수로 함께 알려준다 — `ThumbnailHelper`를 호출할 때 이 값을 그대로 `deleteSource`에 넘겨서, 임시 파일만 정리하고 사용자의 원본 파일은 절대 건드리지 않는다(2026-09-05 수정 — 이전에는 로컬 파일을 드래그해도 항상 삭제했었다).
 - **`OriginalImageWindow`**: 리사이즈 전 원본 이미지를 크게 보여주고, 아무 곳이나 클릭하면 닫힌다. [게임 관리](game-management.md)의 게임 요약 갤러리 항목 클릭 시 사용.
 - **`SingleInstanceWindow<T>`**: 창 종류(T)별로 현재 열려 있는 인스턴스를 추적해, 같은 종류의 새 창을 열면 기존 창을 먼저 닫는다. [게임 관리](game-management.md)의 `GameInfoWindow`(한 번에 하나만 열림)에 사용.

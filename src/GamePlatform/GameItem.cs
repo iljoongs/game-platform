@@ -91,11 +91,11 @@ public class GameItem : INotifyPropertyChanged
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 }
 
-/// <summary>게임 요약 갤러리 캡처 이미지 한 장 (리사이즈본/원본 경로 쌍).</summary>
+/// <summary>게임 요약 갤러리 캡처 이미지 한 장. 원본 크기 그대로 저장하고 화면에는 스케일해서 보여준다
+/// (메인 카드 대표 썸네일과 같은 방식 — doc/game-management.md "게임 요약" 참고).</summary>
 public class ScreenshotItem
 {
     public string Path { get; set; } = string.Empty;
-    public string OriginalPath { get; set; } = string.Empty;
 
     /// <summary>실제 저장된 스크린샷이 아니라, 갤러리 맨 앞에 표시하는 "메인 화면 대표 썸네일" 슬롯이면 true
     /// (GameInfoWindow가 표시 목적으로만 만드는 값 — <see cref="GameItem.Screenshots"/>에는 절대 들어가지 않으므로
