@@ -479,7 +479,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>압축 파일(zip)로 게임을 추가한다 — 압축을 그 자리에서 풀지 않고, zip 자체를 이 게임의 압축
-    /// 파일로 등록한다(압축된 상태로 시작). 실제 압축 해제는 사용자가 카드의 [압축 풀기]를 눌렀을 때
+    /// 파일로 등록한다(압축된 상태로 시작). 실제 압축 해제는 사용자가 카드 우클릭 메뉴의 "압축 풀기"를 눌렀을 때
     /// <see cref="AppPaths.GamesBaseDir"/> 밑에 예약해둔 폴더에서 이루어진다. 압축 파일 자체도 이미
     /// <see cref="AppPaths.GamesBaseDir"/> 밑에 있지 않으면(압축 명령이 만든, 이미 관리 중인 압축 파일이
     /// 아니면) 그 밑으로 옮긴다(doc/game-management.md "게임 추가" 참고, 사용자 요청).</summary>
@@ -714,21 +714,14 @@ public partial class MainWindow : Window
         SingleInstanceWindow<GameInfoWindow>.Show(new GameInfoWindow(item, _games, _settings, SaveState) { Owner = this });
     }
 
-    private void RunOrExtractButton_Click(object sender, RoutedEventArgs e)
+    private void RunButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: GameItem item })
         {
             return;
         }
 
-        if (item.IsCompressed)
-        {
-            _ = ExtractGameAsync(item);
-        }
-        else
-        {
-            RunGame(item);
-        }
+        RunGame(item);
     }
 
     private void RunGame(GameItem item)
@@ -761,7 +754,7 @@ public partial class MainWindow : Window
     /// <summary>카드 우클릭 메뉴의 "압축" — 실행 파일이 있는 폴더 전체를 zip으로 묶어 앱 데이터 폴더에 저장하고,
     /// 원본 폴더는 삭제해 디스크 공간을 확보한다 (doc/game-management.md "게임 압축" 참고). 백그라운드 스레드에서
     /// 진행하므로 압축 중에도 창을 움직이거나 다른 카드를 조작할 수 있다 — 같은 게임에 대한 중복 압축만
-    /// <see cref="GameItem.IsBusy"/>로 막는다. 되돌리려면 카드의 "압축 풀기" 버튼을 쓴다.</summary>
+    /// <see cref="GameItem.IsBusy"/>로 막는다. 되돌리려면 카드 우클릭 메뉴의 "압축 풀기" 항목을 쓴다.</summary>
     private async void CompressGame_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: GameItem item } || item.IsCompressed || item.IsBusy)
@@ -840,7 +833,18 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>카드의 "압축 풀기" 버튼 — 압축 파일을 원래 게임 폴더 위치(또는 zip으로 추가된 게임이면
+    /// <summary>카드 우클릭 메뉴의 "압축 풀기" 항목.</summary>
+    private void ExtractGame_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: GameItem item })
+        {
+            return;
+        }
+
+        _ = ExtractGameAsync(item);
+    }
+
+    /// <summary>카드 우클릭 메뉴의 "압축 풀기" — 압축 파일을 원래 게임 폴더 위치(또는 zip으로 추가된 게임이면
     /// 예약해둔 폴더)에 풀고 압축 파일은 지운다. 압축과 마찬가지로 백그라운드 스레드에서 진행한다.</summary>
     private async Task ExtractGameAsync(GameItem item)
     {

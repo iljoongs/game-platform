@@ -72,6 +72,8 @@
                                               Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVisibleConverter}}"/>
                                     <MenuItem Header="압축" Click="CompressGame_Click"
                                               Visibility="{Binding CanCompress, Converter={StaticResource BoolToVisibleConverter}}"/>
+                                    <MenuItem Header="압축 풀기" Click="ExtractGame_Click"
+                                              Visibility="{Binding CanExtract, Converter={StaticResource BoolToVisibleConverter}}"/>
                                     <MenuItem Header="삭제" Click="DeleteGame_Click"/>
                                 </ContextMenu>
                             </Border.ContextMenu>
@@ -84,7 +86,7 @@
                                            TextTrimming="CharacterEllipsis" TextAlignment="Center"/>
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                     <Button Content="정보" Width="60" Margin="4" Click="InfoButton_Click"/>
-                                    <Button Content="{Binding RunButtonLabel}" Width="70" Margin="4" Click="RunOrExtractButton_Click"
+                                    <Button Content="실행" Width="70" Margin="4" Click="RunButton_Click"
                                             IsEnabled="{Binding IsRunButtonEnabled}"/>
                                 </StackPanel>
                             </StackPanel>
