@@ -14,6 +14,19 @@
     <Window.Resources>
         <local:ThumbnailPathConverter x:Key="ThumbnailPathConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibleConverter"/>
+        <!-- 아이콘/리스트 보기 양쪽에서 공유하는 카드 우클릭 메뉴(doc/game-management.md "메인 화면" 참고) —
+             ContextMenu는 일반 시각 트리 요소가 아니라(별도의 팝업 루트) 여러 컨트롤의 ContextMenu 속성에서
+             같은 리소스 인스턴스를 그대로 참조해도 되고, 열릴 때 PlacementTarget(카드/행)의 DataContext를
+             그대로 물려받는다. -->
+        <ContextMenu x:Key="GameCardContextMenu">
+            <MenuItem Header="썸네일 삭제" Click="DeleteThumbnail_Click"
+                      Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVisibleConverter}}"/>
+            <MenuItem Header="압축" Click="CompressGame_Click"
+                      Visibility="{Binding CanCompress, Converter={StaticResource BoolToVisibleConverter}}"/>
+            <MenuItem Header="압축 풀기" Click="ExtractGame_Click"
+                      Visibility="{Binding CanExtract, Converter={StaticResource BoolToVisibleConverter}}"/>
+            <MenuItem Header="삭제" Click="DeleteGame_Click"/>
+        </ContextMenu>
     </Window.Resources>
     <DockPanel>
         <Menu DockPanel.Dock="Top">
@@ -23,6 +36,14 @@
                 <MenuItem Header="다른 이름으로 저장(_A)..." Click="SaveGameDbAs_Click"/>
             </MenuItem>
             <MenuItem Header="보기(_V)">
+                <MenuItem Header="정렬">
+                    <MenuItem x:Name="AscendingSortMenuItem" Header="오름차순" IsCheckable="True" Click="AscendingSortMenuItem_Click"/>
+                    <MenuItem x:Name="DescendingSortMenuItem" Header="내림차순" IsCheckable="True" Click="DescendingSortMenuItem_Click"/>
+                </MenuItem>
+                <Separator/>
+                <MenuItem x:Name="ListViewMenuItem" Header="리스트 보기" IsCheckable="True" Click="ListViewMenuItem_Click"/>
+                <MenuItem x:Name="IconViewMenuItem" Header="아이콘 보기" IsCheckable="True" Click="IconViewMenuItem_Click"/>
+                <Separator/>
                 <MenuItem Header="카드 크기">
                     <MenuItem x:Name="LargeSizeMenuItem" Header="320x240" IsCheckable="True" Click="LargeSizeMenuItem_Click"/>
                     <MenuItem x:Name="SmallSizeMenuItem" Header="160x120" IsCheckable="True" Click="SmallSizeMenuItem_Click"/>
@@ -55,47 +76,74 @@
             </Grid>
         </Border>
         <ScrollViewer VerticalScrollBarVisibility="Auto">
-            <ItemsControl x:Name="GamesItemsControl">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border Margin="8" Padding="6" BorderBrush="Gray" BorderThickness="1" Background="Transparent"
-                                Width="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=CardWidth}"
-                                AllowDrop="True"
-                                DragOver="Card_DragOver"
-                                Drop="Card_Drop">
-                            <Border.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="썸네일 삭제" Click="DeleteThumbnail_Click"
-                                              Visibility="{Binding HasThumbnail, Converter={StaticResource BoolToVisibleConverter}}"/>
-                                    <MenuItem Header="압축" Click="CompressGame_Click"
-                                              Visibility="{Binding CanCompress, Converter={StaticResource BoolToVisibleConverter}}"/>
-                                    <MenuItem Header="압축 풀기" Click="ExtractGame_Click"
-                                              Visibility="{Binding CanExtract, Converter={StaticResource BoolToVisibleConverter}}"/>
-                                    <MenuItem Header="삭제" Click="DeleteGame_Click"/>
-                                </ContextMenu>
-                            </Border.ContextMenu>
-                            <StackPanel>
-                                <Image Source="{Binding ThumbnailPath, Converter={StaticResource ThumbnailPathConverter}}"
-                                       Width="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=ThumbnailWidth}"
-                                       Height="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=ThumbnailHeight}"
-                                       Stretch="Uniform"/>
-                                <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" Margin="0,4"
-                                           TextTrimming="CharacterEllipsis" TextAlignment="Center"/>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <Button Content="정보" Width="60" Margin="4" Click="InfoButton_Click"/>
-                                    <Button Content="실행" Width="70" Margin="4" Click="RunButton_Click"
-                                            IsEnabled="{Binding IsRunButtonEnabled}"/>
+            <Grid>
+                <!-- 아이콘 보기(기존 썸네일 카드 그리드) — 보기 > 아이콘 보기(기본값)일 때만 보인다. -->
+                <ItemsControl x:Name="GamesItemsControl">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="8" Padding="6" BorderBrush="Gray" BorderThickness="1" Background="Transparent"
+                                    Width="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=CardWidth}"
+                                    AllowDrop="True"
+                                    DragOver="Card_DragOver"
+                                    Drop="Card_Drop"
+                                    ContextMenu="{StaticResource GameCardContextMenu}">
+                                <StackPanel>
+                                    <Image Source="{Binding ThumbnailPath, Converter={StaticResource ThumbnailPathConverter}}"
+                                           Width="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=ThumbnailWidth}"
+                                           Height="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=ThumbnailHeight}"
+                                           Stretch="Uniform"/>
+                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" Margin="0,4"
+                                               TextTrimming="CharacterEllipsis" TextAlignment="Center"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                        <Button Content="정보" Width="60" Margin="4" Click="InfoButton_Click"/>
+                                        <Button Content="실행" Width="70" Margin="4" Click="RunButton_Click"
+                                                IsEnabled="{Binding IsRunButtonEnabled}"/>
+                                    </StackPanel>
                                 </StackPanel>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <!-- 리스트 보기 — 썸네일/이름을 한 줄로 보여준다. 보기 > 리스트 보기를 고르면 보인다. -->
+                <ItemsControl x:Name="GamesListView" Visibility="Collapsed">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Padding="6,4" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Background="Transparent"
+                                    AllowDrop="True"
+                                    DragOver="Card_DragOver"
+                                    Drop="Card_Drop"
+                                    ContextMenu="{StaticResource GameCardContextMenu}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Image Grid.Column="0" Width="48" Height="36" Margin="0,0,10,0" Stretch="Uniform"
+                                           Source="{Binding ThumbnailPath, Converter={StaticResource ThumbnailPathConverter}}"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontWeight="Bold"
+                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal">
+                                        <Button Content="정보" Width="60" Margin="4,0" Click="InfoButton_Click"/>
+                                        <Button Content="실행" Width="70" Margin="4,0" Click="RunButton_Click"
+                                                IsEnabled="{Binding IsRunButtonEnabled}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
         </ScrollViewer>
     </DockPanel>
 </Window>

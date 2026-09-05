@@ -6,6 +6,7 @@ using System.IO.Compression;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 
 namespace GamePlatform;
@@ -16,6 +17,7 @@ public partial class MainWindow : Window
 
     private readonly ObservableCollection<GameItem> _games;
     private readonly AppSettings _settings;
+    private readonly ICollectionView _gamesView;
 
     /// <summary>지금 저장/불러오기 대상인 게임 목록 파일. 기본값은 <see cref="AppPaths.GamesPath"/>이지만
     /// 파일 메뉴의 "열기"/"다른 이름으로 저장"으로 바뀔 수 있다 — 그 뒤로는 자동 저장(<see cref="SaveState"/>)도
@@ -54,7 +56,18 @@ public partial class MainWindow : Window
             game.RefreshExecutableValid();
             game.RefreshArchiveValid();
         }
-        GamesItemsControl.ItemsSource = _games;
+
+        _gamesView = CollectionViewSource.GetDefaultView(_games);
+        GamesItemsControl.ItemsSource = _gamesView;
+        GamesListView.ItemsSource = _gamesView;
+
+        var sortOrder = Enum.TryParse<GameSortOrder>(_settings.SortOrder, out var parsedSortOrder) ? parsedSortOrder : GameSortOrder.Ascending;
+        ApplySortOrder(sortOrder);
+        UpdateSortMenuChecks(sortOrder);
+
+        var viewMode = Enum.TryParse<GameViewMode>(_settings.ViewMode, out var parsedViewMode) ? parsedViewMode : GameViewMode.Icon;
+        ApplyViewMode(viewMode);
+        UpdateViewModeMenuChecks(viewMode);
 
         ApplyWindowBounds();
 
@@ -450,6 +463,63 @@ public partial class MainWindow : Window
     {
         LargeSizeMenuItem.IsChecked = size == GameCardSize.Large;
         SmallSizeMenuItem.IsChecked = size == GameCardSize.Small;
+    }
+
+    private void AscendingSortMenuItem_Click(object sender, RoutedEventArgs e) => ChangeSortOrder(GameSortOrder.Ascending);
+
+    private void DescendingSortMenuItem_Click(object sender, RoutedEventArgs e) => ChangeSortOrder(GameSortOrder.Descending);
+
+    private void ChangeSortOrder(GameSortOrder order)
+    {
+        ApplySortOrder(order);
+        UpdateSortMenuChecks(order);
+        _settings.SortOrder = order.ToString();
+        SettingsRepository.Save(_settings);
+    }
+
+    /// <summary>게임 목록을 `DisplayName` 기준으로 정렬한다 — 원본 컬렉션(<see cref="_games"/>, games.json 저장
+    /// 순서)은 건드리지 않고, 화면에 보여주는 <see cref="_gamesView"/>(아이콘/리스트 보기 공용)의 정렬 조건만
+    /// 바꾼다.</summary>
+    private void ApplySortOrder(GameSortOrder order)
+    {
+        _gamesView.SortDescriptions.Clear();
+        _gamesView.SortDescriptions.Add(new SortDescription(
+            nameof(GameItem.DisplayName),
+            order == GameSortOrder.Ascending ? ListSortDirection.Ascending : ListSortDirection.Descending));
+    }
+
+    /// <summary>"보기 > 정렬" 메뉴도 카드 크기와 같은 방식으로 상호 배타를 직접 관리한다.</summary>
+    private void UpdateSortMenuChecks(GameSortOrder order)
+    {
+        AscendingSortMenuItem.IsChecked = order == GameSortOrder.Ascending;
+        DescendingSortMenuItem.IsChecked = order == GameSortOrder.Descending;
+    }
+
+    private void ListViewMenuItem_Click(object sender, RoutedEventArgs e) => ChangeViewMode(GameViewMode.List);
+
+    private void IconViewMenuItem_Click(object sender, RoutedEventArgs e) => ChangeViewMode(GameViewMode.Icon);
+
+    private void ChangeViewMode(GameViewMode mode)
+    {
+        ApplyViewMode(mode);
+        UpdateViewModeMenuChecks(mode);
+        _settings.ViewMode = mode.ToString();
+        SettingsRepository.Save(_settings);
+    }
+
+    /// <summary>아이콘 보기(기존 썸네일 카드 그리드)와 리스트 보기(한 줄 목록) 중 하나만 보여준다 — 둘 다 같은
+    /// <see cref="_gamesView"/>를 공유하므로 정렬/데이터는 항상 같고 화면에 보이는 모양만 바뀐다.</summary>
+    private void ApplyViewMode(GameViewMode mode)
+    {
+        GamesItemsControl.Visibility = mode == GameViewMode.Icon ? Visibility.Visible : Visibility.Collapsed;
+        GamesListView.Visibility = mode == GameViewMode.List ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>"보기 > 리스트 보기/아이콘 보기" 메뉴도 같은 방식으로 상호 배타를 직접 관리한다.</summary>
+    private void UpdateViewModeMenuChecks(GameViewMode mode)
+    {
+        ListViewMenuItem.IsChecked = mode == GameViewMode.List;
+        IconViewMenuItem.IsChecked = mode == GameViewMode.Icon;
     }
 
     #region 게임 목록 파일 (열기 / 저장 / 다른 이름으로 저장)

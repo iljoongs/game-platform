@@ -11,6 +11,12 @@ public class AppSettings
     /// <summary><see cref="GameScreenshotSize"/> enum 이름 문자열 (예: "Large"/"Medium"/"Small") — 정보 창 게임 요약 갤러리 이미지 크기.</summary>
     public string ScreenshotSizePreset { get; set; } = nameof(GameScreenshotSize.Large);
 
+    /// <summary><see cref="GameViewMode"/> enum 이름 문자열 (예: "Icon"/"List") — 메인 화면 카드/리스트 보기 전환.</summary>
+    public string ViewMode { get; set; } = nameof(GameViewMode.Icon);
+
+    /// <summary><see cref="GameSortOrder"/> enum 이름 문자열 (예: "Ascending"/"Descending") — 메인 화면 게임 정렬 순서.</summary>
+    public string SortOrder { get; set; } = nameof(GameSortOrder.Ascending);
+
     public double? MainWindowWidth { get; set; }
     public double? MainWindowHeight { get; set; }
     public double? MainWindowLeft { get; set; }
