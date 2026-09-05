@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:GamePlatform"
         mc:Ignorable="d"
         Title="Game Platform" Height="720" Width="1100"
+        Icon="Assets/AppIcon.ico"
         AllowDrop="True"
         DragOver="MainWindow_DragOver"
         Drop="MainWindow_Drop"

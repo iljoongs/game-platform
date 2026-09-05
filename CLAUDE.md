@@ -21,10 +21,19 @@ game-platform/
 ├── CLAUDE.md          # 메인 지시서 (이 파일)
 ├── game-platform.sln
 ├── .gitignore
+├── game-platform.png  # 앱 아이콘 원본 PNG (512x512, 코드 아님, 루트 유지) — 아래 "앱 아이콘" 참고
 ├── doc/               # 기능별 상세 보조 지시서 (게임 목록/썸네일/설정 데이터는 %LOCALAPPDATA%\GamePlatform\ 사용 — doc/common-management.md 참고)
 └── src/
     └── GamePlatform/  # 앱 본체 소스 (.NET 8 WPF)
 ```
+
+## 앱 아이콘
+
+exe 아이콘(탐색기/작업 표시줄)과 `MainWindow` 타이틀바 아이콘 모두 `Assets/AppIcon.ico`를 사용한다.
+
+- **원본**: 저장소 루트의 `game-platform.png`(512x512, 알파 채널 포함)를 소스로 쓴다. `System.Drawing`으로 16/32/48/256px 각 크기로 고품질 리샘플링(`InterpolationMode.HighQualityBicubic`, 알파 유지)한 뒤 PNG로 인코딩하고, 이 PNG들을 담은 `.ico`(PNG-압축 아이콘 항목, Vista 이상에서 지원)를 직접 조립하는 1회성 PowerShell 스크립트로 변환했다(video-vault와 동일한 방식, 프로젝트에는 스크립트 자체를 포함하지 않음).
+- **적용 위치**: `src/GamePlatform/GamePlatform.csproj`의 `<ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>`(exe 자체 아이콘) + `<Resource Include="Assets\AppIcon.ico" />`, `MainWindow.xaml`의 `Icon="Assets/AppIcon.ico"`(타이틀바/Alt+Tab).
+- **검증**: 빌드된 exe에서 `System.Drawing.Icon.ExtractAssociatedIcon`으로 아이콘이 정상 임베드되었음을 확인함.
 
 ## 보조 지시서 목록 (doc/ 폴더)
 
