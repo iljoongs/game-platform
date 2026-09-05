@@ -386,9 +386,15 @@ public partial class MainWindow : Window
 
     private void AddGameFromExecutable(string executablePath)
     {
+        var name = Path.GetFileNameWithoutExtension(executablePath);
+        if (!ConfirmAddDuplicateName(name))
+        {
+            return;
+        }
+
         var item = new GameItem
         {
-            Name = Path.GetFileNameWithoutExtension(executablePath),
+            Name = name,
             ExecutablePath = executablePath,
         };
         item.RefreshExecutableValid();
@@ -397,11 +403,40 @@ public partial class MainWindow : Window
         SetStatus($"'{item.DisplayName}' 게임을 추가했습니다.", StatusType.Success);
     }
 
+    /// <summary>같은 이름의 게임이 이미 있으면(버전만 다르게 여러 개 존재하는 것이 정상 시나리오이므로)
+    /// 버전이 다른 게임이 맞는지 사용자에게 확인한다 — 예: 새 버전으로 추가 진행, 아니요: 추가 취소
+    /// (doc/game-management.md "게임 추가" 참고, 사용자 요청). 같은 이름이 없으면 바로 true.</summary>
+    private bool ConfirmAddDuplicateName(string name)
+    {
+        if (!_games.Any(g => string.Equals(g.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        var confirm = MessageBox.Show(this,
+            $"'{name}' 이름의 게임이 이미 있습니다.\n버전이 다른 게임인가요?\n\n예: 새 버전으로 추가합니다.\n아니요: 추가를 취소합니다.",
+            "동일한 이름의 게임", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+        if (confirm != MessageBoxResult.Yes)
+        {
+            SetStatus($"'{name}' 게임 추가를 취소했습니다.", StatusType.Info);
+            return false;
+        }
+
+        return true;
+    }
+
     /// <summary>폴더로 게임을 추가한다. 이미 <see cref="AppPaths.GamesBaseDir"/>(D:\game) 밑에 있는 폴더면
     /// 그 자리를 그대로 쓰고, 그 바깥에 있으면 게임 등록과 함께 그 밑으로 옮긴다(doc/game-management.md
     /// "게임 추가" 참고, 사용자 요청) — 백그라운드 스레드에서 진행하며 상태바에 진행률을 보여준다.</summary>
     private async Task AddGameFromFolderAsync(string folderPath)
     {
+        var folderName = Path.GetFileName(folderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        if (!ConfirmAddDuplicateName(folderName))
+        {
+            return;
+        }
+
         List<string> relativePaths;
         try
         {
@@ -427,7 +462,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        var folderName = Path.GetFileName(folderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         var targetFolderPath = folderPath;
 
         if (!AppPaths.IsUnderGamesBaseDir(folderPath))
@@ -485,6 +519,12 @@ public partial class MainWindow : Window
     /// 아니면) 그 밑으로 옮긴다(doc/game-management.md "게임 추가" 참고, 사용자 요청).</summary>
     private async Task AddGameFromArchiveAsync(string zipPath)
     {
+        var name = Path.GetFileNameWithoutExtension(zipPath);
+        if (!ConfirmAddDuplicateName(name))
+        {
+            return;
+        }
+
         List<string> relativePaths;
         try
         {
@@ -511,7 +551,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var item = new GameItem { Name = Path.GetFileNameWithoutExtension(zipPath) };
+        var item = new GameItem { Name = name };
         var gameFolder = AppPaths.ReserveGameFolder(item.DisplayName);
         item.ExecutablePath = Path.Combine(gameFolder, chosen);
 
