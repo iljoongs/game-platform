@@ -2,7 +2,7 @@
 
 > [메인 지시서](../CLAUDE.md)의 하위 문서. 특정 게임 항목에 속하지 않고 앱 전체에 적용되는 것들 — 저장 경로, 설정, 썸네일/드래그앤드롭 공용 인프라, 오류 처리 — 을 모은다. 게임 카드/실행/정보 창 자체는 [게임 관리](game-management.md) 참고.
 
-**관련 파일 (예정, 아직 미구현)**: `App.xaml`/`.xaml.cs`, `AppPaths.cs`, `AppSettings.cs`, `SettingsRepository.cs`, `ImageLoadHelper.cs`, `ThumbnailPathConverter.cs`, `ThumbnailHelper.cs`, `DragDropImageHelper.cs`, `OriginalImageWindow.xaml`/`.xaml.cs`, `SingleInstanceWindow.cs`, `BackupService.cs`
+**관련 파일 (예정, 아직 미구현)**: `App.xaml`/`.xaml.cs`, `AppPaths.cs`, `AppSettings.cs`, `SettingsRepository.cs`, `ImageLoadHelper.cs`, `ThumbnailPathConverter.cs`, `ThumbnailHelper.cs`, `DragDropImageHelper.cs`, `OriginalImageWindow.xaml`/`.xaml.cs`, `SingleInstanceWindow.cs`, `WindowPositionMemory.cs`, `WindowSizeMemory.cs`, `BackupService.cs`
 
 ## video-vault에서 이식하는 인프라
 
@@ -35,6 +35,15 @@ video-vault의 `AppPaths` 패턴을 따라 `%LOCALAPPDATA%\GamePlatform\` 아래
 
 - 카드 크기 프리셋(320x240 / 160x120) — 마지막 선택값을 기억했다가 다음 실행 시 복원한다.
 - 아래 "백업"의 마지막 일간/주간 백업 수행 시각(`LastDailyBackupUtc`/`LastWeeklyBackupUtc`)도 함께 저장한다.
+- 아래 "창 위치/크기 기억"의 값들도 함께 저장한다.
+
+## 창 위치/크기 기억
+
+`MainWindow`와 `GameInfoWindow`([게임 관리](game-management.md) 참고) 모두 닫을 때의 화면 위치(Left/Top)와 크기(Width/Height)를 기억했다가, 다음에 열 때 그대로 복원한다. video-vault의 방식을 그대로 따른다.
+
+- **`MainWindow`**: 앱을 대표하는 창이라 `AppSettings.MainWindowWidth/Height/Left/Top` 전용 필드로 별도 저장한다. 창이 최대화된 상태로 닫히면 `RestoreBounds`(최대화 이전의 "정상" 크기/위치)를 저장해, 다음 실행이 항상 전체화면으로 시작되지 않게 한다. 저장된 값이 없거나(최초 실행) 현재 화면 구성에서 화면 밖으로 벗어난 좌표면 XAML 기본값으로 시작한다.
+- **`GameInfoWindow`**: `WindowPositionMemory`/`WindowSizeMemory`(창 클래스 이름을 키로 위치/크기를 기억하는 공용 저장소, video-vault에서 이식)로 관리한다. 창 종류가 하나뿐이라도 나중에 창이 추가될 걸 대비해 범용 저장소를 그대로 쓴다.
+- 두 창 모두 값이 바뀔 때마다 즉시 저장하지 않고(위치 이동/크기 조절마다 저장하기엔 너무 잦음), **창을 닫는 시점에 그때의 최종 상태를 저장**한다.
 
 ## 백업 (`games.json`)
 
