@@ -97,6 +97,202 @@ public partial class MainWindow : Window
         }
     }
 
+    #region 등록된 게임 정리 (분류 폴더 밖으로 이동)
+
+    /// <summary>메뉴 "설정 > 분류 폴더 안의 게임 정리" — 이미 등록된 게임 중 사용자가 기본 폴더 안에 직접
+    /// 만들어 둔 분류용 하위 폴더(예: `D:\game\- rpg -\게임폴더`)에 남아 있는 것을 찾아 기본 폴더 바로 밑으로
+    /// 옮기고 games.json의 ExecutablePath/ArchivePath를 새 위치로 갱신한다. 폴더/압축 파일로 게임을 새로
+    /// 추가할 때 이미 적용 중인 "기본 폴더 바로 밑이 아니면 옮긴다" 규칙
+    /// (<see cref="AppPaths.IsDirectlyUnderGamesBaseDir"/>, doc/game-management.md "게임 추가" 참고)을 과거에
+    /// 등록된 게임에도 소급 적용하는 일회성 정리 기능이다(2026-09-06 추가, 사용자 요청). exe 하나만 단독으로
+    /// 등록한 게임(기본 폴더 밖 어디에 있든)은 애초에 옮기는 대상이 아니므로 건드리지 않는다.</summary>
+    private async void CleanUpCategoryFolderGames_Click(object sender, RoutedEventArgs e)
+    {
+        var folderCandidates = new List<(GameItem Item, string GameFolder, string RelativeExecutablePath)>();
+        var archiveCandidates = new List<(GameItem Item, string ArchiveFile)>();
+
+        foreach (var item in _games)
+        {
+            if (item.IsBusy)
+            {
+                continue;
+            }
+
+            if (item.IsCompressed)
+            {
+                if (!string.IsNullOrEmpty(item.ArchivePath) && File.Exists(item.ArchivePath) &&
+                    TryGetNestedArchiveFile(item.ArchivePath, out var archiveFile))
+                {
+                    archiveCandidates.Add((item, archiveFile));
+                }
+            }
+            else if (!string.IsNullOrEmpty(item.ExecutablePath) &&
+                     TryGetNestedGameFolder(item.ExecutablePath, out var gameFolder, out var relativeExe))
+            {
+                folderCandidates.Add((item, gameFolder, relativeExe));
+            }
+        }
+
+        var totalCount = folderCandidates.Count + archiveCandidates.Count;
+        if (totalCount == 0)
+        {
+            MessageBox.Show(this, "분류 폴더 안에 남아 있는 게임이 없습니다.", "정리", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var confirm = MessageBox.Show(this,
+            $"'{AppPaths.GamesBaseDir}' 안의 분류 폴더에 있는 게임 {totalCount}개를 기본 폴더 바로 밑으로 옮기고 정보를 갱신합니다.\n계속할까요?",
+            "게임 정리", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        var succeeded = 0;
+        var failed = 0;
+        var current = 0;
+
+        foreach (var (item, gameFolder, relativeExe) in folderCandidates)
+        {
+            current++;
+            item.IsBusy = true;
+            ShowCompressProgress($"({current}/{totalCount}) '{item.DisplayName}' 폴더를 '{AppPaths.GamesBaseDir}'(으)로 옮기는 중...", indeterminate: true);
+            SetStatus($"'{item.DisplayName}' 폴더를 '{AppPaths.GamesBaseDir}'(으)로 옮기는 중입니다...", StatusType.Info);
+
+            var destFolder = AppPaths.ReserveUniquePath(FileNameHelper.Sanitize(Path.GetFileName(gameFolder)));
+            try
+            {
+                await Task.Run(() => MoveDirectory(gameFolder, destFolder));
+                item.ExecutablePath = Path.Combine(destFolder, relativeExe);
+                item.RefreshExecutableValid();
+                succeeded++;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                SetStatus($"'{item.DisplayName}' 폴더를 옮기지 못했습니다: {ex.Message}", StatusType.Error);
+            }
+            finally
+            {
+                item.IsBusy = false;
+                HideCompressProgress();
+            }
+        }
+
+        foreach (var (item, archiveFile) in archiveCandidates)
+        {
+            current++;
+            item.IsBusy = true;
+            ShowCompressProgress($"({current}/{totalCount}) '{item.DisplayName}' 압축 파일을 '{AppPaths.GamesBaseDir}'(으)로 옮기는 중...", indeterminate: true);
+            SetStatus($"'{item.DisplayName}' 압축 파일을 '{AppPaths.GamesBaseDir}'(으)로 옮기는 중입니다...", StatusType.Info);
+
+            var destFile = AppPaths.ReserveUniquePath(Path.GetFileName(archiveFile));
+            try
+            {
+                await Task.Run(() => File.Move(archiveFile, destFile));
+                item.ArchivePath = destFile;
+                item.RefreshArchiveValid();
+                succeeded++;
+            }
+            catch (Exception ex)
+            {
+                failed++;
+                SetStatus($"'{item.DisplayName}' 압축 파일을 옮기지 못했습니다: {ex.Message}", StatusType.Error);
+            }
+            finally
+            {
+                item.IsBusy = false;
+                HideCompressProgress();
+            }
+        }
+
+        SaveState();
+        SetStatus(
+            failed == 0
+                ? $"게임 {succeeded}개를 '{AppPaths.GamesBaseDir}' 밑으로 옮기고 정보를 갱신했습니다."
+                : $"게임 {succeeded}개를 옮겼고, {failed}개는 실패했습니다.",
+            failed == 0 ? StatusType.Success : StatusType.Warning);
+    }
+
+    /// <summary>실행 파일 경로가 기본 폴더 안의 분류용 하위 폴더 밑에 있으면(기본 폴더 기준 "분류 폴더/게임
+    /// 폴더/.../실행 파일"처럼 3단계 이상 깊이) 옮겨야 할 게임 폴더 자체(분류 폴더 바로 밑의 폴더)와 그 폴더
+    /// 기준 실행 파일의 상대 경로를 계산해 돌려준다. 이미 기본 폴더 바로 밑에 있거나(정상), 기본 폴더 밖에
+    /// 있으면(exe 단독 드래그드롭 — 원래부터 옮기지 않는 대상), 또는 분류 폴더 바로 밑에 exe가 단독으로 있어
+    /// (2단계 깊이) 같이 옮겨야 할 폴더를 특정할 수 없으면 false.</summary>
+    private static bool TryGetNestedGameFolder(string executablePath, out string gameFolder, out string relativeExecutablePath)
+    {
+        gameFolder = string.Empty;
+        relativeExecutablePath = string.Empty;
+
+        var baseFull = Path.GetFullPath(AppPaths.GamesBaseDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var prefix = baseFull + Path.DirectorySeparatorChar;
+        var fullExe = Path.GetFullPath(executablePath);
+        if (!fullExe.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var segments = fullExe[prefix.Length..].Split(
+            new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length < 3)
+        {
+            return false;
+        }
+
+        gameFolder = Path.Combine(baseFull, segments[0], segments[1]);
+        relativeExecutablePath = Path.Combine(segments[2..]);
+        return true;
+    }
+
+    /// <summary>압축 파일 경로가 기본 폴더 안의 분류용 하위 폴더 밑에 있으면(기본 폴더 바로 밑이 아님) 그
+    /// 파일 경로를 그대로 돌려준다. "압축" 명령이 만드는 내부 관리 위치(<see cref="AppPaths.ArchivesDir"/> 밑)는
+    /// 원래부터 깊은 곳에 있는 게 정상이므로 제외한다.</summary>
+    private static bool TryGetNestedArchiveFile(string archivePath, out string archiveFile)
+    {
+        archiveFile = string.Empty;
+
+        var baseFull = Path.GetFullPath(AppPaths.GamesBaseDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var prefix = baseFull + Path.DirectorySeparatorChar;
+        var fullArchive = Path.GetFullPath(archivePath);
+        if (!fullArchive.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var archivesFull = Path.GetFullPath(AppPaths.ArchivesDir).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        if (fullArchive.Equals(archivesFull, StringComparison.OrdinalIgnoreCase) ||
+            fullArchive.StartsWith(archivesFull + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if (AppPaths.IsDirectlyUnderGamesBaseDir(fullArchive))
+        {
+            return false;
+        }
+
+        archiveFile = fullArchive;
+        return true;
+    }
+
+    /// <summary>같은 기본 폴더 안에서의 이동은 항상 같은 드라이브이므로 <see cref="Directory.Move"/>로
+    /// 즉시(이름 변경 수준으로) 옮긴다. 혹시 실패하면(예: 파일 잠금) 게임 추가와 같은 복사 후 삭제 방식으로
+    /// 대체한다.</summary>
+    private static void MoveDirectory(string sourceDir, string destDir)
+    {
+        try
+        {
+            Directory.Move(sourceDir, destDir);
+        }
+        catch
+        {
+            CopyDirectoryContents(sourceDir, destDir, new Progress<int>());
+            RetryDelete(() => Directory.Delete(sourceDir, recursive: true));
+        }
+    }
+
+    #endregion
+
     /// <summary>데이터 폴더를 D:\game 밑으로 옮긴 뒤, games.json에 저장돼 있던 옛 절대경로
     /// (ThumbnailPath/Screenshots/ArchivePath)를 새 위치 기준으로 바로잡고, 실제로 뭔가 바뀌었을 때만
     /// 다시 저장한다 — 실제 파일은 <see cref="AppPaths.EnsureAppDataDirectory"/>에서 이미 옮겨졌지만,

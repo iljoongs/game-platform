@@ -30,6 +30,8 @@
             </MenuItem>
             <MenuItem Header="설정(_S)">
                 <MenuItem Header="환경설정..." Click="OpenPreferences_Click"/>
+                <Separator/>
+                <MenuItem Header="분류 폴더 안의 게임 정리..." Click="CleanUpCategoryFolderGames_Click"/>
             </MenuItem>
         </Menu>
         <!-- 상태바(video-vault의 SeriesManagerWindow 패턴) — 게임 추가/삭제/썸네일 지정/압축 등 각종 이벤트를
