@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -506,27 +507,43 @@ public partial class MainWindow : Window
         ShowCompressProgress($"'{item.DisplayName}' 압축 중...");
         SetStatus($"'{item.DisplayName}' 압축을 시작했습니다.", StatusType.Info);
 
+        AppPaths.EnsureArchiveDirectory(item.Id);
+        var archivePath = AppPaths.GameArchivePath(item.Id, item.DisplayName);
+
         try
         {
-            AppPaths.EnsureArchiveDirectory(item.Id);
-            var archivePath = AppPaths.GameArchivePath(item.Id, item.DisplayName);
             var progress = new Progress<int>(percent => CompressProgressBar.Value = percent);
-
             await Task.Run(() => CompressDirectory(gameDir, archivePath, progress));
-            Directory.Delete(gameDir, recursive: true);
+        }
+        catch (Exception ex)
+        {
+            try { if (File.Exists(archivePath)) File.Delete(archivePath); } catch { /* 미완성 zip 정리 시도, 실패해도 무시 */ }
+            SetStatus($"'{item.DisplayName}' 압축에 실패했습니다: {ex.Message}", StatusType.Error);
+            item.IsBusy = false;
+            HideCompressProgress();
+            return;
+        }
 
-            item.ArchivePath = archivePath;
-            item.ArchiveSizeBytes = new FileInfo(archivePath).Length;
-            item.CompressedAtUtc = DateTime.UtcNow;
-            item.IsCompressed = true;
-            item.RefreshExecutableValid();
-            item.RefreshArchiveValid();
-            SaveState();
+        // 압축 파일은 이 시점에 이미 완성됐다 — 그 아래 폴더 삭제가 실패하더라도 이 게임을 "압축됨"으로
+        // 등록해서, 방금 만든 zip이 games.json 어디서도 참조되지 않는 고아 파일로 남지 않게 한다
+        // (실제로 겪은 문제: 압축은 끝났는데 원본 폴더 삭제만 "다른 프로세스가 사용 중"으로 실패하자,
+        // 전체를 실패로 취급해서 완성된 zip이 등록되지 않은 채 남아버렸다).
+        item.ArchivePath = archivePath;
+        item.ArchiveSizeBytes = new FileInfo(archivePath).Length;
+        item.CompressedAtUtc = DateTime.UtcNow;
+        item.IsCompressed = true;
+        item.RefreshExecutableValid();
+        item.RefreshArchiveValid();
+        SaveState();
+
+        try
+        {
+            await Task.Run(() => RetryDelete(() => Directory.Delete(gameDir, recursive: true)));
             SetStatus($"'{item.DisplayName}' 압축을 완료했습니다 ({item.ArchiveSizeDisplay}).", StatusType.Success);
         }
         catch (Exception ex)
         {
-            SetStatus($"'{item.DisplayName}' 압축에 실패했습니다: {ex.Message}", StatusType.Error);
+            SetStatus($"'{item.DisplayName}' 압축은 완료했지만 원본 폴더를 지우지 못했습니다({ex.Message}) — 나중에 수동으로 지워도 됩니다.", StatusType.Warning);
         }
         finally
         {
@@ -562,31 +579,63 @@ public partial class MainWindow : Window
         ShowCompressProgress($"'{item.DisplayName}' 압축 푸는 중...");
         SetStatus($"'{item.DisplayName}' 압축 풀기를 시작했습니다.", StatusType.Info);
 
+        var archivePath = item.ArchivePath;
+
         try
         {
-            var archivePath = item.ArchivePath;
             var progress = new Progress<int>(percent => CompressProgressBar.Value = percent);
-
             await Task.Run(() => ExtractArchive(archivePath, gameDir, progress));
-            File.Delete(archivePath);
-
-            item.IsCompressed = false;
-            item.ArchivePath = null;
-            item.ArchiveSizeBytes = 0;
-            item.CompressedAtUtc = null;
-            item.RefreshExecutableValid();
-            item.RefreshArchiveValid();
-            SaveState();
-            SetStatus($"'{item.DisplayName}' 압축을 풀었습니다.", StatusType.Success);
         }
         catch (Exception ex)
         {
             SetStatus($"'{item.DisplayName}' 압축을 풀지 못했습니다: {ex.Message}", StatusType.Error);
+            item.IsBusy = false;
+            HideCompressProgress();
+            return;
+        }
+
+        // 파일은 이미 다 풀렸다 — 옛 압축 파일 삭제가 실패해도 이 게임은 "압축 안 됨"으로 되돌린다
+        // (압축과 대칭: 핵심 작업 성공 여부와 뒷정리 실패를 분리해서, 뒷정리 실패로 전체를 실패 취급하지 않는다).
+        item.IsCompressed = false;
+        item.ArchivePath = null;
+        item.ArchiveSizeBytes = 0;
+        item.CompressedAtUtc = null;
+        item.RefreshExecutableValid();
+        item.RefreshArchiveValid();
+        SaveState();
+
+        try
+        {
+            await Task.Run(() => RetryDelete(() => File.Delete(archivePath)));
+            SetStatus($"'{item.DisplayName}' 압축을 풀었습니다.", StatusType.Success);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"'{item.DisplayName}' 압축은 풀었지만 옛 압축 파일을 지우지 못했습니다({ex.Message}) — 나중에 수동으로 지워도 됩니다.", StatusType.Warning);
         }
         finally
         {
             item.IsBusy = false;
             HideCompressProgress();
+        }
+    }
+
+    /// <summary>백신 실시간 검사/탐색기 등이 파일이나 폴더를 잠깐 잠그는 경우가 흔해서, 바로 실패 처리하지
+    /// 않고 짧은 대기 후 몇 번 더 시도한다 (실제로 겪은 사례: 압축은 끝났는데 원본 폴더 삭제만 "다른 프로세스가
+    /// 사용 중"으로 실패 — 잠깐 뒤에는 대개 풀린다). 백그라운드 스레드에서 호출된다.</summary>
+    private static void RetryDelete(Action deleteAction, int attempts = 5, int delayMilliseconds = 500)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                deleteAction();
+                return;
+            }
+            catch when (attempt < attempts)
+            {
+                Thread.Sleep(delayMilliseconds);
+            }
         }
     }
 
