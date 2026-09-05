@@ -57,6 +57,37 @@ public partial class MainWindow : Window
             ? $"데이터 폴더를 '{AppPaths.GamesBaseDir}' 밑으로 옮겼습니다."
             : "실행 파일/폴더/압축 파일(zip)을 이 창에 끌어다 놓으면 게임이 추가됩니다. 카드에 이미지를 끌어다 놓으면 대표 썸네일이 지정됩니다. 카드 우클릭으로 삭제/압축할 수 있습니다.",
             StatusType.Info);
+
+        _ = CleanUpLeftoverCompressedFoldersAsync();
+    }
+
+    /// <summary>
+    /// 압축은 끝났지만 원본 폴더 삭제가 (백신 실시간 검사 등으로 인한 일시적 파일 잠금 때문에) 실패해서
+    /// 원본 폴더가 그대로 남아 있는 게임이 있으면, 시작할 때마다 조용히 다시 지워본다 — 실제로 겪은 문제의
+    /// 재발 방지책. 잠금은 대개 몇 초~몇 분 안에 풀리므로, 압축 시점의 즉시 재시도(<see cref="RetryDelete"/>)로
+    /// 못 지웠더라도 다음 실행 시점에는 대개 지울 수 있다. 실패해도 조용히 넘어가고 다음 실행 때 다시 시도한다 —
+    /// 게임 데이터 자체(zip)는 이미 안전하게 등록되어 있으므로 사용자가 당장 조치할 필요는 없다.
+    /// </summary>
+    private async Task CleanUpLeftoverCompressedFoldersAsync()
+    {
+        foreach (var game in _games.Where(g => g.IsCompressed).ToList())
+        {
+            var gameDir = string.IsNullOrEmpty(game.ExecutablePath) ? null : Path.GetDirectoryName(game.ExecutablePath);
+            if (string.IsNullOrEmpty(gameDir) || !Directory.Exists(gameDir))
+            {
+                continue;
+            }
+
+            try
+            {
+                await Task.Run(() => RetryDelete(() => Directory.Delete(gameDir, recursive: true), attempts: 3, delayMilliseconds: 1000));
+                SetStatus($"이전에 지우지 못했던 '{game.DisplayName}'의 원본 폴더를 정리했습니다.", StatusType.Success);
+            }
+            catch
+            {
+                // 여전히 잠겨 있으면 이번에도 조용히 넘어가고 다음 실행 때 다시 시도한다.
+            }
+        }
     }
 
     /// <summary>데이터 폴더를 D:\game 밑으로 옮긴 뒤, games.json에 저장돼 있던 옛 절대경로
@@ -622,8 +653,10 @@ public partial class MainWindow : Window
 
     /// <summary>백신 실시간 검사/탐색기 등이 파일이나 폴더를 잠깐 잠그는 경우가 흔해서, 바로 실패 처리하지
     /// 않고 짧은 대기 후 몇 번 더 시도한다 (실제로 겪은 사례: 압축은 끝났는데 원본 폴더 삭제만 "다른 프로세스가
-    /// 사용 중"으로 실패 — 잠깐 뒤에는 대개 풀린다). 백그라운드 스레드에서 호출된다.</summary>
-    private static void RetryDelete(Action deleteAction, int attempts = 5, int delayMilliseconds = 500)
+    /// 사용 중"으로 실패 — 잠깐 뒤에는 대개 풀린다). 백그라운드 스레드(<c>Task.Run</c>)에서 호출되므로 총
+    /// 대기 시간(기본값 기준 약 9초)만큼 걸려도 창은 멈추지 않는다. 그래도 안 풀리면 <see cref="CleanUpLeftoverCompressedFoldersAsync"/>가
+    /// 다음 실행 시 다시 시도한다.</summary>
+    private static void RetryDelete(Action deleteAction, int attempts = 10, int delayMilliseconds = 1000)
     {
         for (var attempt = 1; ; attempt++)
         {
