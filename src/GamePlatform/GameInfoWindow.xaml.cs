@@ -245,6 +245,12 @@ public partial class GameInfoWindow : Window
             newScreenshotsByGame[game] = sourceScreenshots.Select(s => CopyScreenshot(s, destDir)).ToList();
         }
 
+        // 대표 썸네일이 아직 없는 버전에, 이미 대표 썸네일이 있는 다른 버전(우선 이 창에서 연 버전 자신)의
+        // 것을 가져와 채운다 — 이미 자기 썸네일이 있는 버전은 건드리지 않는다(doc/game-management.md
+        // "버전 통합" 참고, 사용자 요청).
+        var sourceThumbnail = _item.HasThumbnail ? _item.ThumbnailPath : siblings.FirstOrDefault(g => g.HasThumbnail)?.ThumbnailPath;
+        var thumbnailTargets = sourceThumbnail is null ? new List<GameItem>() : siblings.Where(g => !g.HasThumbnail).ToList();
+
         foreach (var game in siblings)
         {
             DeleteScreenshotFiles(game.Screenshots);
@@ -257,12 +263,35 @@ public partial class GameInfoWindow : Window
             game.Description = mergedDescription;
         }
 
+        foreach (var game in thumbnailTargets)
+        {
+            ApplyThumbnailFrom(game, sourceThumbnail!);
+        }
+
         DescriptionTextBox.Text = _item.Description;
         RefreshGallery();
 
         _onChanged();
-        MessageBox.Show(this, $"이름이 같은 버전 {siblings.Count}개의 게임 내용/게임 요약을 통합했습니다.",
+        var thumbnailNote = thumbnailTargets.Count > 0 ? $" 대표 썸네일이 없던 {thumbnailTargets.Count}개에도 대표 썸네일을 채웠습니다." : "";
+        MessageBox.Show(this, $"이름이 같은 버전 {siblings.Count}개의 게임 내용/게임 요약을 통합했습니다.{thumbnailNote}",
             "버전 통합", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    /// <summary>다른 버전의 대표 썸네일 파일을 이 게임의 이미지 폴더로 복사해 대표 썸네일로 지정한다(원본은
+    /// 지우지 않음). <see cref="MainWindow.ApplyThumbnail"/>과 같은 방식 — <see cref="ThumbnailHelper.CopyOriginal"/>은
+    /// 항상 "cover.original.{확장자}"에 저장하므로 기존 파일을 먼저 지우고, `ThumbnailPath`도 값이 그대로일 수
+    /// 있어 한 번 null로 지웠다가 다시 지정해 변경 알림이 항상 나가게 한다.</summary>
+    private static void ApplyThumbnailFrom(GameItem game, string sourceThumbnailPath)
+    {
+        var destDir = AppPaths.GameImagesDir(game.Id);
+        foreach (var file in Directory.Exists(destDir) ? Directory.GetFiles(destDir, "cover.original.*") : Array.Empty<string>())
+        {
+            try { File.Delete(file); } catch { /* 새 썸네일 저장에는 지장 없으므로 무시 */ }
+        }
+
+        var newPath = ThumbnailHelper.CopyOriginal(sourceThumbnailPath, destDir, "cover", deleteSource: false);
+        game.ThumbnailPath = null;
+        game.ThumbnailPath = newPath;
     }
 
     private static string BuildMergedDescription(IEnumerable<GameItem> siblings) => string.Join("\n\n", siblings
