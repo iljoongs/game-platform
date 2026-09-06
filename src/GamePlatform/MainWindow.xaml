@@ -97,70 +97,73 @@
             </Grid>
         </Border>
         <Grid>
-            <!-- 아이콘 보기(기존 썸네일 카드 그리드) — 보기 > 아이콘 보기(기본값)일 때만 보인다. `ItemsControl`은
-                 자체 스크롤 기능이 없으므로 전용 ScrollViewer로 감싼다. 리스트 보기(아래 ListView)는 자체
-                 스크롤을 내장하고 있어 같은 ScrollViewer로 같이 감싸면 안 된다 — 감싸면 마우스 휠 이벤트를
-                 안쪽 ScrollViewer가 항상 먼저 소비해버려서(실제로 스크롤할 내용이 없어도) 바깥쪽으로 넘어가지
-                 않아 리스트 보기에서 스크롤이 안 되는 문제가 있었다(2026-09-06 수정, 사용자 요청). -->
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <!-- `ItemsControl`이 아니라 `ListBox`를 쓰는 이유: 카드를 클릭해서 "선택"할 수 있어야
-                     F1/게임 정보 자동 갱신이 어느 카드를 대상으로 할지 알 수 있다(2026-09-06 추가, 사용자
-                     요청) — 리스트 보기(ListView)는 원래부터 Selector라 같은 방식으로 쓸 수 있다.
-                     `ItemContainerStyle`로 기본 파란 선택 배경 대신 카드 테두리만 강조색으로 바꾼다. -->
-                <ListBox x:Name="GamesItemsControl" SelectionChanged="GamesSelector_SelectionChanged"
-                         BorderThickness="0" Background="Transparent">
-                    <ListBox.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel/>
-                        </ItemsPanelTemplate>
-                    </ListBox.ItemsPanel>
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <Setter Property="Padding" Value="0"/>
-                            <Setter Property="Margin" Value="0"/>
-                            <Setter Property="Template">
-                                <Setter.Value>
-                                    <ControlTemplate TargetType="ListBoxItem">
-                                        <Border x:Name="SelectionBorder" BorderThickness="2" BorderBrush="Transparent">
-                                            <ContentPresenter/>
-                                        </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="#2563EB"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Setter.Value>
-                            </Setter>
-                        </Style>
-                    </ListBox.ItemContainerStyle>
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <Border Margin="8" Padding="6" BorderBrush="Gray" BorderThickness="1" Background="Transparent"
-                                    Width="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=CardWidth}"
-                                    AllowDrop="True"
-                                    DragOver="Card_DragOver"
-                                    Drop="Card_Drop"
-                                    ContextMenu="{StaticResource GameCardContextMenu}">
-                                <StackPanel>
-                                    <Image Source="{Binding ThumbnailPath, Converter={StaticResource ThumbnailPathConverter}}"
-                                           Width="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=ThumbnailWidth}"
-                                           Height="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=ThumbnailHeight}"
-                                           Stretch="Uniform"/>
-                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" Margin="0,4"
-                                               TextTrimming="CharacterEllipsis" TextAlignment="Center"
-                                               Style="{StaticResource GameNameTextStyle}"/>
-                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <Button Content="정보" Width="60" Margin="4" Click="InfoButton_Click"/>
-                                        <Button Content="실행" Width="70" Margin="4" Click="RunButton_Click"
-                                                IsEnabled="{Binding IsRunButtonEnabled}"/>
-                                    </StackPanel>
+            <!-- 아이콘 보기(기존 썸네일 카드 그리드) — 보기 > 아이콘 보기(기본값)일 때만 보인다. `ListBox`는
+                 (아래 `ItemsControl`이 아니라 `ListBox`를 쓰는 이유 참고) 기본 컨트롤 템플릿 안에 이미
+                 자체 ScrollViewer를 내장하고 있으므로 별도로 감싸지 않는다 — 예전에 `ItemsControl`을 쓰던
+                 시절 붙여 놓은 감싸는 ScrollViewer를 그대로 남겨 두면 이중 ScrollViewer가 되어, 안쪽(ListBox
+                 내장) ScrollViewer의 기본 HorizontalScrollBarVisibility(Auto)가 WrapPanel의 가로 폭을
+                 무한대로 측정해버려 카드가 줄바꿈되지 않고 한 줄로 쭉 나열되는 문제가 있었다(2026-09-07
+                 수정, 사용자 리포트). `ScrollViewer.HorizontalScrollBarVisibility="Disabled"`를 ListBox에
+                 직접(첨부 속성으로) 지정해 내장 ScrollViewer가 폭을 창 너비로 제한하게 한다. -->
+            <!-- `ItemsControl`이 아니라 `ListBox`를 쓰는 이유: 카드를 클릭해서 "선택"할 수 있어야
+                 F1/게임 정보 자동 갱신이 어느 카드를 대상으로 할지 알 수 있다(2026-09-06 추가, 사용자
+                 요청) — 리스트 보기(ListView)는 원래부터 Selector라 같은 방식으로 쓸 수 있다.
+                 `ItemContainerStyle`로 기본 파란 선택 배경 대신 카드 테두리만 강조색으로 바꾼다. -->
+            <ListBox x:Name="GamesItemsControl" SelectionChanged="GamesSelector_SelectionChanged"
+                     BorderThickness="0" Background="Transparent"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="Margin" Value="0"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="ListBoxItem">
+                                    <Border x:Name="SelectionBorder" BorderThickness="2" BorderBrush="Transparent">
+                                        <ContentPresenter/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="#2563EB"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="8" Padding="6" BorderBrush="Gray" BorderThickness="1" Background="Transparent"
+                                Width="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=CardWidth}"
+                                AllowDrop="True"
+                                DragOver="Card_DragOver"
+                                Drop="Card_Drop"
+                                ContextMenu="{StaticResource GameCardContextMenu}">
+                            <StackPanel>
+                                <Image Source="{Binding ThumbnailPath, Converter={StaticResource ThumbnailPathConverter}}"
+                                       Width="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=ThumbnailWidth}"
+                                       Height="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=ThumbnailHeight}"
+                                       Stretch="Uniform"/>
+                                <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" Margin="0,4"
+                                           TextTrimming="CharacterEllipsis" TextAlignment="Center"
+                                           Style="{StaticResource GameNameTextStyle}"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <Button Content="정보" Width="60" Margin="4" Click="InfoButton_Click"/>
+                                    <Button Content="실행" Width="70" Margin="4" Click="RunButton_Click"
+                                            IsEnabled="{Binding IsRunButtonEnabled}"/>
                                 </StackPanel>
-                            </Border>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                </ListBox>
-            </ScrollViewer>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
             <!-- 리스트 보기(테이블) — 썸네일 없이 칼럼으로 정보를 보여준다. 보기 > 리스트 보기를 고르면
                  보인다(doc/game-management.md "메인 화면" 참고). "게임 이름"/"정보"/"실행" 칼럼은 항상
                  보이고, 나머지(버전/평점/신사 등급/폴더)는 헤더 우클릭 메뉴로 켜고 끌 수 있다 —
