@@ -14,11 +14,11 @@ namespace GamePlatform;
 /// </summary>
 public partial class GameInfoWindow : Window
 {
-    private readonly GameItem _item;
+    private GameItem _item;
     private readonly IEnumerable<GameItem> _allGames;
     private readonly AppSettings _settings;
     private readonly Action _onChanged;
-    private readonly bool _isLoading;
+    private bool _isLoading;
     private bool _isSyncingRating;
     private bool _isSyncingGentlemanGrade;
 
@@ -35,19 +35,9 @@ public partial class GameInfoWindow : Window
         _onChanged = onChanged;
 
         _isLoading = true;
-        NameTextBox.Text = item.Name;
-        VersionTextBox.Text = item.Version;
-        DescriptionTextBox.Text = item.Description;
-        ExecutablePathTextBox.Text = item.ExecutablePath;
-        RatingSlider.Value = item.Rating;
-        RatingTextBox.Text = item.Rating.ToString("0");
-        GentlemanGradeSlider.Value = item.GentlemanGrade;
-        GentlemanGradeTextBox.Text = item.GentlemanGrade.ToString("0");
         ScreenshotsItemsControl.ItemsSource = _gallery;
-        RefreshGallery();
-        RefreshArchiveInfo();
+        LoadFromItem();
         _item.PropertyChanged += Item_PropertyChanged;
-        UpdateTitle();
 
         (GameScreenshotSizeSettings.Current.Preset switch
         {
@@ -62,6 +52,44 @@ public partial class GameInfoWindow : Window
             Width = width;
             Height = height;
         }
+    }
+
+    /// <summary>메인 화면에서 다른 게임을 선택하면, 이미 열려 있는 이 창을 새로 열지 않고 그 자리에서 새
+    /// 게임의 내용으로 바꿔 보여준다(doc/game-management.md "정보 창" 참고, 사용자 요청). 지금 보고 있는
+    /// 게임과 같으면 아무 것도 하지 않는다.</summary>
+    public void SwitchTo(GameItem newItem)
+    {
+        if (ReferenceEquals(_item, newItem))
+        {
+            return;
+        }
+
+        _item.PropertyChanged -= Item_PropertyChanged;
+        _item = newItem;
+        _item.PropertyChanged += Item_PropertyChanged;
+
+        _isLoading = true;
+        LoadFromItem();
+        _isLoading = false;
+    }
+
+    /// <summary>텍스트박스/슬라이더/갤러리/압축 정보/창 제목 등 <see cref="_item"/>에 의존하는 화면 요소를
+    /// 전부 지금의 <see cref="_item"/> 값으로 채운다 — 생성자와 <see cref="SwitchTo"/> 양쪽에서 쓴다. 항상
+    /// <see cref="_isLoading"/>가 true인 동안 호출해서, 값을 채우는 과정에서 TextChanged 등으로 다시
+    /// <see cref="_onChanged"/>가 불리거나 <see cref="_item"/>에 값이 덮어써지지 않게 한다.</summary>
+    private void LoadFromItem()
+    {
+        NameTextBox.Text = _item.Name;
+        VersionTextBox.Text = _item.Version;
+        DescriptionTextBox.Text = _item.Description;
+        ExecutablePathTextBox.Text = _item.ExecutablePath;
+        RatingSlider.Value = _item.Rating;
+        RatingTextBox.Text = _item.Rating.ToString("0");
+        GentlemanGradeSlider.Value = _item.GentlemanGrade;
+        GentlemanGradeTextBox.Text = _item.GentlemanGrade.ToString("0");
+        RefreshGallery();
+        RefreshArchiveInfo();
+        UpdateTitle();
     }
 
     private void UpdateTitle() => Title = $"게임 정보 - {_item.DisplayName}";

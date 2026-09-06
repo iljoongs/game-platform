@@ -6,7 +6,9 @@ using System.IO.Compression;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace GamePlatform;
@@ -18,6 +20,11 @@ public partial class MainWindow : Window
     private readonly ObservableCollection<GameItem> _games;
     private readonly AppSettings _settings;
     private readonly ICollectionView _gamesView;
+
+    /// <summary>아이콘 보기(ListBox)/리스트 보기(ListView)에서 지금 선택된 게임 — F1로 정보 창을 열 때
+    /// 대상이 된다(doc/game-management.md "정보 창" 참고, 사용자 요청). <see cref="GamesSelector_SelectionChanged"/>가
+    /// 갱신한다.</summary>
+    private GameItem? _selectedGame;
 
     /// <summary>리스트 보기(테이블) 칼럼 객체 ↔ 설정에 저장할 때 쓰는 이름. <see cref="ApplyListColumnWidths"/>가
     /// 시작할 때 저장된 너비를 적용하고, 이후 각 칼럼의 `Width`가 바뀔 때마다(사용자가 헤더 경계를 드래그)
@@ -1172,7 +1179,36 @@ public partial class MainWindow : Window
             return;
         }
 
+        OpenGameInfo(item);
+    }
+
+    /// <summary>[정보] 버튼과 F1 키가 공유하는 게임 정보 창 열기 로직.</summary>
+    private void OpenGameInfo(GameItem item) =>
         SingleInstanceWindow<GameInfoWindow>.Show(new GameInfoWindow(item, _games, _settings, SaveState) { Owner = this });
+
+    /// <summary>F1을 누르면 지금 선택된 게임의 정보 창을 연다(doc/game-management.md "정보 창" 참고, 사용자
+    /// 요청) — 아이콘 보기/리스트 보기 둘 다 <see cref="GamesSelector_SelectionChanged"/>가 선택을 추적한다.</summary>
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.F1 && _selectedGame is { } item)
+        {
+            OpenGameInfo(item);
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>아이콘 보기(ListBox)/리스트 보기(ListView) 공용 선택 변경 핸들러 — 지금 선택된 게임을
+    /// 기억해서 F1이 어느 게임을 대상으로 할지 알 수 있게 하고, 이미 게임 정보 창이 열려 있으면 그 창의
+    /// 내용도 새로 선택한 게임으로 바꿔치기한다(2026-09-06 추가, 사용자 요청) — 창을 새로 열지 않는다.</summary>
+    private void GamesSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not Selector { SelectedItem: GameItem item })
+        {
+            return;
+        }
+
+        _selectedGame = item;
+        SingleInstanceWindow<GameInfoWindow>.Current?.SwitchTo(item);
     }
 
     private void RunButton_Click(object sender, RoutedEventArgs e)

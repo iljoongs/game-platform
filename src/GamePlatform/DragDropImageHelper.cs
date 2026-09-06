@@ -182,6 +182,11 @@ public static class DragDropImageHelper
         try
         {
             var bytes = Convert.FromBase64String(match.Groups["data"].Value);
+            if (!IsDecodableImage(bytes))
+            {
+                return null;
+            }
+
             var extension = ExtensionFromContentType(match.Groups["mime"].Value) ?? ".jpg";
             var tempPath = Path.Combine(Path.GetTempPath(), $"GamePlatform_{Guid.NewGuid():N}{extension}");
             File.WriteAllBytes(tempPath, bytes);
@@ -201,6 +206,17 @@ public static class DragDropImageHelper
             response.EnsureSuccessStatusCode();
 
             var bytes = response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+
+            // Content-Type만으로는 부족하다 — 실제로 겪은 문제: 이미지 URL이라고 믿고 내려받았는데
+            // 로그인/쿠키 동의 등으로 서버가 200 OK와 함께 HTML 오류 페이지를 돌려준 적이 있었고, 그걸 그대로
+            // "cover.original.jpg" 등으로 저장해버려서 나중에 그 게임의 정보 창을 열 때마다(이미지를 실제로
+            // 그리려는 시점에) 디코딩이 실패하며 앱이 통째로 죽었다. 확장자/헤더만 보지 않고 직접 디코딩해봐서
+            // 진짜 이미지인지 확인한 뒤에만 파일로 저장한다.
+            if (!IsDecodableImage(bytes))
+            {
+                return null;
+            }
+
             var extension = ExtensionFromContentType(response.Content.Headers.ContentType?.MediaType)
                 ?? ExtensionFromUrl(url)
                 ?? ".jpg";
@@ -212,6 +228,22 @@ public static class DragDropImageHelper
         catch
         {
             return null;
+        }
+    }
+
+    /// <summary>바이트 배열이 WPF가 실제로 디코딩할 수 있는 이미지인지 확인한다 — Content-Type/확장자는
+    /// 서버나 URL이 주장하는 값일 뿐이라 속아 넘어갈 수 있으므로, 직접 디코딩을 시도해보는 것만이 확실하다.</summary>
+    private static bool IsDecodableImage(byte[] bytes)
+    {
+        try
+        {
+            using var stream = new MemoryStream(bytes);
+            BitmapDecoder.Create(stream, BitmapCreateOptions.None, BitmapCacheOption.None);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 

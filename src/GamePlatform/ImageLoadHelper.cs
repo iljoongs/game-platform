@@ -29,18 +29,28 @@ public static class ImageLoadHelper
             return null;
         }
 
-        var bitmap = new BitmapImage();
-        bitmap.BeginInit();
-        bitmap.CacheOption = BitmapCacheOption.OnLoad;
-        bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-        if (decodePixelWidth is { } width)
+        try
         {
-            bitmap.DecodePixelWidth = width;
-        }
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+            if (decodePixelWidth is { } width)
+            {
+                bitmap.DecodePixelWidth = width;
+            }
 
-        bitmap.UriSource = new Uri(path);
-        bitmap.EndInit();
-        bitmap.Freeze();
-        return bitmap;
+            bitmap.UriSource = new Uri(path);
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch
+        {
+            // 확장자만 이미지고 실제 내용은 디코딩할 수 없는 파일(예: 웹에서 다운로드하다가 오류 페이지(HTML)를
+            // 이미지인 줄 알고 저장해버린 경우 — 실제로 겪은 문제로, 이 파일을 보여주려 할 때마다 앱이 통째로
+            // 죽었다)이 하나 섞여 있어도 그 항목만 빈 이미지로 보이고, 앱 전체가 죽지는 않게 한다.
+            return null;
+        }
     }
 }

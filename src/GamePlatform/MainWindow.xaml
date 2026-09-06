@@ -10,7 +10,8 @@
         AllowDrop="True"
         DragOver="MainWindow_DragOver"
         Drop="MainWindow_Drop"
-        Closing="MainWindow_Closing">
+        Closing="MainWindow_Closing"
+        PreviewKeyDown="MainWindow_PreviewKeyDown">
     <Window.Resources>
         <local:ThumbnailPathConverter x:Key="ThumbnailPathConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibleConverter"/>
@@ -101,13 +102,38 @@
                  안쪽 ScrollViewer가 항상 먼저 소비해버려서(실제로 스크롤할 내용이 없어도) 바깥쪽으로 넘어가지
                  않아 리스트 보기에서 스크롤이 안 되는 문제가 있었다(2026-09-06 수정, 사용자 요청). -->
             <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <ItemsControl x:Name="GamesItemsControl">
-                    <ItemsControl.ItemsPanel>
+                <!-- `ItemsControl`이 아니라 `ListBox`를 쓰는 이유: 카드를 클릭해서 "선택"할 수 있어야
+                     F1/게임 정보 자동 갱신이 어느 카드를 대상으로 할지 알 수 있다(2026-09-06 추가, 사용자
+                     요청) — 리스트 보기(ListView)는 원래부터 Selector라 같은 방식으로 쓸 수 있다.
+                     `ItemContainerStyle`로 기본 파란 선택 배경 대신 카드 테두리만 강조색으로 바꾼다. -->
+                <ListBox x:Name="GamesItemsControl" SelectionChanged="GamesSelector_SelectionChanged"
+                         BorderThickness="0" Background="Transparent">
+                    <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
                         </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
+                    </ListBox.ItemsPanel>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="Margin" Value="0"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="SelectionBorder" BorderThickness="2" BorderBrush="Transparent">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="#2563EB"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
                         <DataTemplate>
                             <Border Margin="8" Padding="6" BorderBrush="Gray" BorderThickness="1" Background="Transparent"
                                     Width="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=CardWidth}"
@@ -131,8 +157,8 @@
                                 </StackPanel>
                             </Border>
                         </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                    </ListBox.ItemTemplate>
+                </ListBox>
             </ScrollViewer>
             <!-- 리스트 보기(테이블) — 썸네일 없이 칼럼으로 정보를 보여준다. 보기 > 리스트 보기를 고르면
                  보인다(doc/game-management.md "메인 화면" 참고). "게임 이름"/"정보"/"실행" 칼럼은 항상
@@ -146,6 +172,7 @@
                  동작하지 않는다. -->
             <ListView x:Name="GamesListView" Visibility="Collapsed"
                       TextSearch.TextPath="Name"
+                      SelectionChanged="GamesSelector_SelectionChanged"
                       ScrollViewer.HorizontalScrollBarVisibility="Auto">
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
