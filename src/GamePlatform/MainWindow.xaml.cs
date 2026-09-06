@@ -569,13 +569,18 @@ public partial class MainWindow : Window
 
     /// <summary>게임 목록을 `DisplayName` 기준으로 정렬한다 — 원본 컬렉션(<see cref="_games"/>, games.json 저장
     /// 순서)은 건드리지 않고, 화면에 보여주는 <see cref="_gamesView"/>(아이콘/리스트 보기 공용)의 정렬 조건만
-    /// 바꾼다.</summary>
+    /// 바꾼다. `SortDescription`(기본 문자열 비교) 대신 <see cref="ListCollectionView.CustomSort"/>에
+    /// <see cref="NaturalStringComparer"/>를 걸어, 이름 안의 숫자(버전 등)를 자릿수가 아니라 값으로 비교한다
+    /// (예: "v0.23.8" &lt; "v0.23.10" — 사용자 요청, 문자열 비교로는 반대로 정렬됐었다).</summary>
     private void ApplySortOrder(GameSortOrder order)
     {
-        _gamesView.SortDescriptions.Clear();
-        _gamesView.SortDescriptions.Add(new SortDescription(
-            nameof(GameItem.DisplayName),
-            order == GameSortOrder.Ascending ? ListSortDirection.Ascending : ListSortDirection.Descending));
+        var ascending = order == GameSortOrder.Ascending;
+        var comparer = Comparer<GameItem>.Create((a, b) =>
+        {
+            var result = NaturalStringComparer.Instance.Compare(a.DisplayName, b.DisplayName);
+            return ascending ? result : -result;
+        });
+        ((ListCollectionView)_gamesView).CustomSort = comparer;
     }
 
     /// <summary>"보기 > 정렬" 메뉴도 카드 크기와 같은 방식으로 상호 배타를 직접 관리한다.</summary>
