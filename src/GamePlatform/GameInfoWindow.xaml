@@ -14,7 +14,61 @@
     <Window.Resources>
         <local:ThumbnailPathConverter x:Key="ThumbnailPathConverter"/>
         <local:EmptyPathToVisibleConverter x:Key="EmptyPathToVisibleConverter"/>
+        <local:ProgressColorConverter x:Key="ProgressColorConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibleConverter"/>
+
+        <!-- 평점/신사 등급 슬라이더의 "채워진 부분"(흰색)과 "안 채워진 부분"(투명 — 뒤의 색 트랙이 그대로
+             보임) — 기본 RepeatButton 크롬을 걷어내고 단색 Border만 남긴다. -->
+        <Style x:Key="RatingFillRepeatButtonStyle" TargetType="RepeatButton">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="White" CornerRadius="13"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="RatingEmptyRepeatButtonStyle" TargetType="RepeatButton">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- sample.png 참고 — 진행률(0~100) 구간마다 트랙 색이 바뀌는 알약 모양 슬라이더. 보통
+             ProgressBar가 아니라 Slider를 쓰는 이유는 막대를 직접 클릭/드래그해서 값을 바로 지정해야
+             하기 때문이다(IsMoveToPointEnabled). Thumb은 크기 0으로 감춰서, 눈에는 흰 채움 막대가
+             늘었다 줄었다 하는 것처럼만 보인다. -->
+        <Style x:Key="RatingSliderStyle" TargetType="Slider">
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid>
+                            <Border CornerRadius="13"
+                                    Background="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource ProgressColorConverter}}"/>
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource RatingFillRepeatButtonStyle}" Command="Slider.DecreaseLarge"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Width="0" Height="0" Opacity="0"/>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource RatingEmptyRepeatButtonStyle}" Command="Slider.IncreaseLarge"/>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="12">
@@ -43,6 +97,16 @@
             <TextBox x:Name="DescriptionTextBox" AcceptsReturn="True" TextWrapping="Wrap"
                      Height="140" VerticalScrollBarVisibility="Auto"
                      TextChanged="DescriptionTextBox_TextChanged" Margin="0,2,0,10"/>
+
+            <TextBlock Text="{Binding Value, ElementName=RatingSlider, StringFormat=평점 ({0:0}%)}"/>
+            <Slider x:Name="RatingSlider" Style="{StaticResource RatingSliderStyle}"
+                    Minimum="0" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1"
+                    ValueChanged="RatingSlider_ValueChanged" Margin="0,2,0,10"/>
+
+            <TextBlock Text="{Binding Value, ElementName=GentlemanGradeSlider, StringFormat=신사 등급 ({0:0}%)}"/>
+            <Slider x:Name="GentlemanGradeSlider" Style="{StaticResource RatingSliderStyle}"
+                    Minimum="0" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1"
+                    ValueChanged="GentlemanGradeSlider_ValueChanged" Margin="0,2,0,10"/>
 
             <TextBlock Text="게임 요약 (첫 번째는 메인 화면 대표 썸네일입니다. 이 창에 이미지를 끌어다 놓으면 추가됩니다. 클릭하면 원본 크기로 봅니다. 우클릭으로 삭제)"
                        TextWrapping="Wrap"/>

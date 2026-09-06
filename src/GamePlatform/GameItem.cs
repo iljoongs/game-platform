@@ -23,6 +23,8 @@ public class GameItem : INotifyPropertyChanged
     private DateTime? _compressedAtUtc;
     private bool _isArchiveValid;
     private bool _isBusy;
+    private double _rating;
+    private double _gentlemanGrade;
 
     /// <summary>고유 식별자. 이미지 저장 폴더명(<see cref="AppPaths.GameImagesDir"/>)으로 쓰인다.</summary>
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
@@ -179,6 +181,21 @@ public class GameItem : INotifyPropertyChanged
                 OnPropertyChanged(nameof(CanCompress));
             }
         }
+    }
+
+    /// <summary>평점(0~100) — 정보 창 게임 요약 위의 진행바 형태 슬라이더로 표시/편집한다
+    /// (doc/game-management.md "정보 창" 참고).</summary>
+    public double Rating
+    {
+        get => _rating;
+        set { if (_rating != value) { _rating = value; OnPropertyChanged(); } }
+    }
+
+    /// <summary>신사 등급(0~100) — <see cref="Rating"/>과 같은 방식의 별개 평가 항목.</summary>
+    public double GentlemanGrade
+    {
+        get => _gentlemanGrade;
+        set { if (_gentlemanGrade != value) { _gentlemanGrade = value; OnPropertyChanged(); } }
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

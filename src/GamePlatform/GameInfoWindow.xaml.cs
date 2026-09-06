@@ -37,6 +37,8 @@ public partial class GameInfoWindow : Window
         VersionTextBox.Text = item.Version;
         DescriptionTextBox.Text = item.Description;
         ExecutablePathTextBox.Text = item.ExecutablePath;
+        RatingSlider.Value = item.Rating;
+        GentlemanGradeSlider.Value = item.GentlemanGrade;
         ScreenshotsItemsControl.ItemsSource = _gallery;
         RefreshGallery();
         RefreshArchiveInfo();
@@ -126,6 +128,20 @@ public partial class GameInfoWindow : Window
     {
         if (_isLoading) return;
         _item.Description = DescriptionTextBox.Text;
+        _onChanged();
+    }
+
+    private void RatingSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_isLoading) return;
+        _item.Rating = RatingSlider.Value;
+        _onChanged();
+    }
+
+    private void GentlemanGradeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_isLoading) return;
+        _item.GentlemanGrade = GentlemanGradeSlider.Value;
         _onChanged();
     }
 
