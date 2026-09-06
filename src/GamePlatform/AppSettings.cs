@@ -29,6 +29,11 @@ public class AppSettings
     /// "GentlemanGrade"/"Folder"/"Info"/"Run", `MainWindow._listColumnKeys` 참고).</summary>
     public Dictionary<string, double> ListColumnWidths { get; set; } = new();
 
+    /// <summary>마지막으로 선택했던 게임의 <see cref="GameItem.Id"/> — 다음 실행 시 같은 게임을 다시
+    /// 선택된 상태로 복원한다(doc/game-management.md "메인 화면" 참고, 사용자 요청). 선택한 적이 없거나
+    /// 그 게임이 목록에서 지워졌으면 null.</summary>
+    public string? LastSelectedGameId { get; set; }
+
     public double? MainWindowWidth { get; set; }
     public double? MainWindowHeight { get; set; }
     public double? MainWindowLeft { get; set; }

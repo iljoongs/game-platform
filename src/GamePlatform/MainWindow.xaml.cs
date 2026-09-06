@@ -92,6 +92,7 @@ public partial class MainWindow : Window
         ApplyListColumnWidths();
 
         ApplyWindowBounds();
+        RestoreLastSelectedGame();
 
         BackupService.CheckAndBackup(_settings, _currentGamesPath);
 
@@ -1280,6 +1281,30 @@ public partial class MainWindow : Window
 
         _selectedGame = item;
         SingleInstanceWindow<GameInfoWindow>.Current?.SwitchTo(item);
+
+        _settings.LastSelectedGameId = item.Id;
+        SettingsRepository.Save(_settings);
+    }
+
+    /// <summary>마지막으로 선택했던 게임을(있으면) 시작할 때 다시 선택하고 그 위치로 스크롤한다
+    /// (2026-09-06 추가, 사용자 요청) — 정렬/보기 방식이 적용된 뒤에 불러야 화면에 보이는 위치가 맞다.</summary>
+    private void RestoreLastSelectedGame()
+    {
+        if (string.IsNullOrEmpty(_settings.LastSelectedGameId))
+        {
+            return;
+        }
+
+        var game = _games.FirstOrDefault(g => g.Id == _settings.LastSelectedGameId);
+        if (game is null)
+        {
+            return;
+        }
+
+        _selectedGame = game;
+        GamesItemsControl.SelectedItem = game;
+        GamesListView.SelectedItem = game;
+        ScrollGameIntoView(game);
     }
 
     private void RunButton_Click(object sender, RoutedEventArgs e)
