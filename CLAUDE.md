@@ -43,6 +43,7 @@ exe 아이콘(탐색기/작업 표시줄)과 `MainWindow` 타이틀바 아이콘
 |---|---|
 | [doc/game-management.md](doc/game-management.md) | 게임 카드 목록(메인 화면), 카드 추가/삭제, 대표 썸네일, 실행, 정보 창(`GameInfoWindow`), `GameItem` 데이터 모델 |
 | [doc/common-management.md](doc/common-management.md) | 저장 경로(`AppPaths`), 설정 저장, video-vault에서 이식하는 썸네일/드래그앤드롭 공용 인프라, 오류 처리 |
+| [doc/release-folder-naming.md](doc/release-folder-naming.md) | `D:\game\.latest` 등 아직 앱에 등록하지 않은 게임 릴리즈 폴더의 이름 정리 규칙 (대소문자, 구분자, 버전 표기, 태그 단어 제거, 시즌/에피소드/파트 축약형) |
 
 ## 작업 원칙
 

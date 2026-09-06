@@ -351,6 +351,50 @@ public partial class MainWindow : Window
             missingCount == 0 ? StatusType.Success : StatusType.Warning);
     }
 
+    /// <summary>메뉴 "설정 > 게임 이름에서 버전 분리..." — Name 필드 끝에 버전처럼 보이는 부분이 붙어 있고
+    /// Version 필드는 비어 있는 게임을 찾아 Name/Version으로 나눠 담는다(예: "Game-v1.2.3" → Name="Game",
+    /// Version="v1.2.3", 사용자 요청). 이미 Version이 있는 게임은 덮어쓰지 않는다.</summary>
+    private void SplitNameVersion_Click(object sender, RoutedEventArgs e)
+    {
+        var candidates = new List<(GameItem Game, string NewName, string NewVersion)>();
+        foreach (var game in _games)
+        {
+            if (!string.IsNullOrWhiteSpace(game.Version))
+            {
+                continue;
+            }
+
+            var (splitName, splitVersion) = FileNameHelper.SplitNameAndVersion(game.Name);
+            if (!string.IsNullOrEmpty(splitVersion))
+            {
+                candidates.Add((game, splitName, splitVersion));
+            }
+        }
+
+        if (candidates.Count == 0)
+        {
+            MessageBox.Show(this, "이름에서 분리할 버전이 있는 게임이 없습니다.", "버전 분리", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var confirm = MessageBox.Show(this,
+            $"게임 이름에 붙어 있는 버전을 분리할 게임이 {candidates.Count}개 있습니다.\n계속할까요?",
+            "버전 분리", MessageBoxButton.YesNo, MessageBoxImage.Question);
+        if (confirm != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        foreach (var (game, newName, newVersion) in candidates)
+        {
+            game.Name = newName;
+            game.Version = newVersion;
+        }
+
+        SaveState();
+        SetStatus($"게임 {candidates.Count}개의 이름에서 버전을 분리했습니다.", StatusType.Success);
+    }
+
     /// <summary>데이터 폴더를 D:\game 밑으로 옮긴 뒤, games.json에 저장돼 있던 옛 절대경로
     /// (ThumbnailPath/Screenshots/ArchivePath)를 새 위치 기준으로 바로잡고, 실제로 뭔가 바뀌었을 때만
     /// 다시 저장한다 — 실제 파일은 <see cref="AppPaths.EnsureAppDataDirectory"/>에서 이미 옮겨졌지만,
@@ -794,8 +838,8 @@ public partial class MainWindow : Window
 
     private void AddGameFromExecutable(string executablePath)
     {
-        var name = Path.GetFileNameWithoutExtension(executablePath);
-        if (!ConfirmAddDuplicateName(name))
+        var (name, version) = FileNameHelper.SplitNameAndVersion(Path.GetFileNameWithoutExtension(executablePath));
+        if (!ConfirmAddDuplicateName(name, version))
         {
             return;
         }
@@ -803,6 +847,7 @@ public partial class MainWindow : Window
         var item = new GameItem
         {
             Name = name,
+            Version = version,
             ExecutablePath = executablePath,
         };
         item.RefreshExecutableValid();
@@ -812,11 +857,33 @@ public partial class MainWindow : Window
         ScrollGameIntoView(item);
     }
 
-    /// <summary>같은 이름의 게임이 이미 있으면(버전만 다르게 여러 개 존재하는 것이 정상 시나리오이므로)
-    /// 버전이 다른 게임이 맞는지 사용자에게 확인한다 — 예: 새 버전으로 추가 진행, 아니요: 추가 취소
-    /// (doc/game-management.md "게임 추가" 참고, 사용자 요청). 같은 이름이 없으면 바로 true.</summary>
-    private bool ConfirmAddDuplicateName(string name)
+    /// <summary>이름과 버전이 완전히 같은 게임이 이미 있으면(이번 요청, 사용자 요청) 그래도 추가할지
+    /// 먼저 물어본다. 이름만 같고 버전이 다르면(버전만 다르게 여러 개 존재하는 것이 정상 시나리오이므로)
+    /// 버전이 다른 게임이 맞는지 확인한다 — 예: 새 버전으로 추가 진행, 아니요: 추가 취소
+    /// (doc/game-management.md "게임 추가" 참고, 사용자 요청). 같은 이름이 전혀 없으면 바로 true.</summary>
+    private bool ConfirmAddDuplicateName(string name, string version)
     {
+        var displayName = string.IsNullOrWhiteSpace(version) ? name : $"{name}-{version}";
+
+        var exactMatch = _games.Any(g =>
+            string.Equals(g.Name, name, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(g.Version, version, StringComparison.OrdinalIgnoreCase));
+
+        if (exactMatch)
+        {
+            var confirmExact = MessageBox.Show(this,
+                $"'{displayName}' 게임이 이미 있습니다(이름과 버전이 모두 같음).\n그래도 추가할까요?",
+                "동일한 게임", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+            if (confirmExact != MessageBoxResult.Yes)
+            {
+                SetStatus($"'{displayName}' 게임 추가를 취소했습니다.", StatusType.Info);
+                return false;
+            }
+
+            return true;
+        }
+
         if (!_games.Any(g => string.Equals(g.Name, name, StringComparison.OrdinalIgnoreCase)))
         {
             return true;
@@ -828,7 +895,7 @@ public partial class MainWindow : Window
 
         if (confirm != MessageBoxResult.Yes)
         {
-            SetStatus($"'{name}' 게임 추가를 취소했습니다.", StatusType.Info);
+            SetStatus($"'{displayName}' 게임 추가를 취소했습니다.", StatusType.Info);
             return false;
         }
 
@@ -841,7 +908,8 @@ public partial class MainWindow : Window
     private async Task AddGameFromFolderAsync(string folderPath)
     {
         var folderName = Path.GetFileName(folderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-        if (!ConfirmAddDuplicateName(folderName))
+        var (precheckName, precheckVersion) = FileNameHelper.SplitNameAndVersion(folderName);
+        if (!ConfirmAddDuplicateName(precheckName, precheckVersion))
         {
             return;
         }
@@ -927,9 +995,12 @@ public partial class MainWindow : Window
             HideCompressProgress();
         }
 
+        var (finalName, finalVersion) = FileNameHelper.SplitNameAndVersion(
+            Path.GetFileName(targetFolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
         var item = new GameItem
         {
-            Name = Path.GetFileName(targetFolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)),
+            Name = finalName,
+            Version = finalVersion,
             ExecutablePath = Path.Combine(targetFolderPath, chosen),
         };
         item.RefreshExecutableValid();
@@ -946,8 +1017,8 @@ public partial class MainWindow : Window
     /// 아니면) 그 밑으로 옮긴다(doc/game-management.md "게임 추가" 참고, 사용자 요청).</summary>
     private async Task AddGameFromArchiveAsync(string zipPath)
     {
-        var name = Path.GetFileNameWithoutExtension(zipPath);
-        if (!ConfirmAddDuplicateName(name))
+        var (name, version) = FileNameHelper.SplitNameAndVersion(Path.GetFileNameWithoutExtension(zipPath));
+        if (!ConfirmAddDuplicateName(name, version))
         {
             return;
         }
@@ -978,7 +1049,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var item = new GameItem { Name = name };
+        var item = new GameItem { Name = name, Version = version };
         var gameFolder = AppPaths.ReserveGameFolder(item.DisplayName);
         item.ExecutablePath = Path.Combine(gameFolder, chosen);
 

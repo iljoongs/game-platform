@@ -73,6 +73,7 @@
                 <Separator/>
                 <MenuItem Header="분류 폴더 안의 게임 정리..." Click="CleanUpCategoryFolderGames_Click"/>
                 <MenuItem Header="실행 파일 확인..." Click="CheckExecutables_Click"/>
+                <MenuItem Header="게임 이름에서 버전 분리..." Click="SplitNameVersion_Click"/>
             </MenuItem>
         </Menu>
         <!-- 상태바(video-vault의 SeriesManagerWindow 패턴) — 게임 추가/삭제/썸네일 지정/압축 등 각종 이벤트를
