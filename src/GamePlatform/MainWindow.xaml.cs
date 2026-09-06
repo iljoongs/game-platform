@@ -321,6 +321,29 @@ public partial class MainWindow : Window
 
     #endregion
 
+    /// <summary>메뉴 "설정 > 실행 파일 확인..." — 등록된 모든 게임의 실행 파일이 실제로 그 자리에 있는지
+    /// 다시 확인한다(doc/game-management.md "실행 파일 확인" 참고). 파일을 지우거나 옮기지는 않고, 상태만
+    /// 새로 고쳐서 실행 파일을 찾을 수 없는 게임의 이름이 빨간 글자로 보이게 한다(`GameItem.IsExecutableMissing`).
+    /// 압축 상태인 게임은 원래 실행 파일이 없는 게 정상이므로 대상에서 뺀다.</summary>
+    private void CheckExecutables_Click(object sender, RoutedEventArgs e)
+    {
+        var missingCount = 0;
+        foreach (var game in _games)
+        {
+            game.RefreshExecutableValid();
+            if (game.IsExecutableMissing)
+            {
+                missingCount++;
+            }
+        }
+
+        SetStatus(
+            missingCount == 0
+                ? "모든 게임의 실행 파일을 확인했습니다. 문제없이 잘 있네요!"
+                : $"실행 파일을 찾을 수 없는 게임이 {missingCount}개 있어요 — 목록에서 빨간 글자로 표시했습니다.",
+            missingCount == 0 ? StatusType.Success : StatusType.Warning);
+    }
+
     /// <summary>데이터 폴더를 D:\game 밑으로 옮긴 뒤, games.json에 저장돼 있던 옛 절대경로
     /// (ThumbnailPath/Screenshots/ArchivePath)를 새 위치 기준으로 바로잡고, 실제로 뭔가 바뀌었을 때만
     /// 다시 저장한다 — 실제 파일은 <see cref="AppPaths.EnsureAppDataDirectory"/>에서 이미 옮겨졌지만,

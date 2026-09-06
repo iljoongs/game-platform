@@ -92,11 +92,26 @@ public class GameItem : INotifyPropertyChanged
     public bool IsExecutableValid
     {
         get => _isExecutableValid;
-        private set { if (_isExecutableValid != value) { _isExecutableValid = value; OnPropertyChanged(); OnPropertyChanged(nameof(IsRunButtonEnabled)); } }
+        private set
+        {
+            if (_isExecutableValid != value)
+            {
+                _isExecutableValid = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(IsRunButtonEnabled));
+                OnPropertyChanged(nameof(IsExecutableMissing));
+            }
+        }
     }
 
     public void RefreshExecutableValid() =>
         IsExecutableValid = !string.IsNullOrEmpty(ExecutablePath) && File.Exists(ExecutablePath);
+
+    /// <summary>실행 파일을 찾을 수 없는(지워졌거나 옮겨진) 상태인지 — 메인 화면에서 게임 이름을 빨간
+    /// 글자로 보여줄지 결정한다(doc/game-management.md "실행 파일 확인" 참고). 압축 상태는 원래 실행 파일이
+    /// 없는 게 정상이므로(<see cref="IsCompressed"/>) 여기서는 문제로 치지 않는다.</summary>
+    [JsonIgnore]
+    public bool IsExecutableMissing => !IsCompressed && !IsExecutableValid;
 
     /// <summary>이 게임이 지금 압축된(원본 폴더는 지워지고 zip으로만 존재하는) 상태인지 여부 —
     /// doc/game-management.md "게임 압축" 참고. 압축 중에는 <see cref="ExecutablePath"/> 파일이 실제로
@@ -113,6 +128,7 @@ public class GameItem : INotifyPropertyChanged
                 OnPropertyChanged(nameof(IsRunButtonEnabled));
                 OnPropertyChanged(nameof(CanCompress));
                 OnPropertyChanged(nameof(CanExtract));
+                OnPropertyChanged(nameof(IsExecutableMissing));
             }
         }
     }

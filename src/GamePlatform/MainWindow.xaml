@@ -29,6 +29,16 @@
         </ContextMenu>
         <!-- 리스트 보기(테이블) 헤더 우클릭 메뉴 — 선택적 칼럼(버전/평점/신사 등급/폴더)을 켜고 끈다.
              "게임 이름"/"정보"/"실행"은 항상 보이므로 여기 없다(doc/game-management.md "메인 화면" 참고). -->
+        <!-- 실행 파일을 찾을 수 없는 게임의 이름을 빨간 글자로 보여준다(doc/game-management.md "실행 파일 확인"
+             참고) — 아이콘 보기 카드/리스트 보기 "게임 이름" 칼럼 양쪽에서 같이 쓴다. 압축 상태는
+             GameItem.IsExecutableMissing이 이미 문제로 치지 않으므로 여기서 따로 걸러낼 필요가 없다. -->
+        <Style x:Key="GameNameTextStyle" TargetType="TextBlock">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsExecutableMissing}" Value="True">
+                    <Setter Property="Foreground" Value="Red"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <ContextMenu x:Key="ListColumnVisibilityMenu">
             <MenuItem Header="버전" IsCheckable="True" Click="ToggleVersionColumn_Click"/>
             <MenuItem Header="평점" IsCheckable="True" Click="ToggleRatingColumn_Click"/>
@@ -61,6 +71,7 @@
                 <MenuItem Header="환경설정..." Click="OpenPreferences_Click"/>
                 <Separator/>
                 <MenuItem Header="분류 폴더 안의 게임 정리..." Click="CleanUpCategoryFolderGames_Click"/>
+                <MenuItem Header="실행 파일 확인..." Click="CheckExecutables_Click"/>
             </MenuItem>
         </Menu>
         <!-- 상태바(video-vault의 SeriesManagerWindow 패턴) — 게임 추가/삭제/썸네일 지정/압축 등 각종 이벤트를
@@ -110,7 +121,8 @@
                                            Height="{Binding Source={x:Static local:GameCardSizeSettings.Current}, Path=ThumbnailHeight}"
                                            Stretch="Uniform"/>
                                     <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" Margin="0,4"
-                                               TextTrimming="CharacterEllipsis" TextAlignment="Center"/>
+                                               TextTrimming="CharacterEllipsis" TextAlignment="Center"
+                                               Style="{StaticResource GameNameTextStyle}"/>
                                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                         <Button Content="정보" Width="60" Margin="4" Click="InfoButton_Click"/>
                                         <Button Content="실행" Width="70" Margin="4" Click="RunButton_Click"
@@ -154,7 +166,8 @@
                         <GridViewColumn x:Name="NameColumn" Header="게임 이름" Width="160">
                             <GridViewColumn.CellTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                               Style="{StaticResource GameNameTextStyle}"/>
                                 </DataTemplate>
                             </GridViewColumn.CellTemplate>
                         </GridViewColumn>
