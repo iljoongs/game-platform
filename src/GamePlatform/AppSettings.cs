@@ -17,6 +17,13 @@ public class AppSettings
     /// <summary><see cref="GameSortOrder"/> enum 이름 문자열 (예: "Ascending"/"Descending") — 메인 화면 게임 정렬 순서.</summary>
     public string SortOrder { get; set; } = nameof(GameSortOrder.Ascending);
 
+    /// <summary>리스트 보기(테이블)의 "버전"/"평점"/"신사 등급"/"폴더" 칼럼 표시 여부 — 테이블 헤더 우클릭 메뉴로
+    /// 전환한다(doc/game-management.md "메인 화면" 참고). "게임 이름"/"정보"/"실행"은 항상 보이므로 설정이 없다.</summary>
+    public bool ListShowVersion { get; set; } = true;
+    public bool ListShowRating { get; set; } = true;
+    public bool ListShowGentlemanGrade { get; set; } = true;
+    public bool ListShowFolder { get; set; } = true;
+
     public double? MainWindowWidth { get; set; }
     public double? MainWindowHeight { get; set; }
     public double? MainWindowLeft { get; set; }

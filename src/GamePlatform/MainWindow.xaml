@@ -27,6 +27,14 @@
                       Visibility="{Binding CanExtract, Converter={StaticResource BoolToVisibleConverter}}"/>
             <MenuItem Header="삭제" Click="DeleteGame_Click"/>
         </ContextMenu>
+        <!-- 리스트 보기(테이블) 헤더 우클릭 메뉴 — 선택적 칼럼(버전/평점/신사 등급/폴더)을 켜고 끈다.
+             "게임 이름"/"정보"/"실행"은 항상 보이므로 여기 없다(doc/game-management.md "메인 화면" 참고). -->
+        <ContextMenu x:Key="ListColumnVisibilityMenu">
+            <MenuItem Header="버전" IsCheckable="True" Click="ToggleVersionColumn_Click"/>
+            <MenuItem Header="평점" IsCheckable="True" Click="ToggleRatingColumn_Click"/>
+            <MenuItem Header="신사 등급" IsCheckable="True" Click="ToggleGentlemanGradeColumn_Click"/>
+            <MenuItem Header="폴더" IsCheckable="True" Click="ToggleFolderColumn_Click"/>
+        </ContextMenu>
     </Window.Resources>
     <DockPanel>
         <Menu DockPanel.Dock="Top">
@@ -109,40 +117,81 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <!-- 리스트 보기 — 썸네일/이름을 한 줄로 보여준다. 보기 > 리스트 보기를 고르면 보인다. -->
-                <ItemsControl x:Name="GamesListView" Visibility="Collapsed">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Border Padding="6,4" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1" Background="Transparent"
-                                    AllowDrop="True"
-                                    DragOver="Card_DragOver"
-                                    Drop="Card_Drop"
-                                    ContextMenu="{StaticResource GameCardContextMenu}">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Image Grid.Column="0" Width="48" Height="36" Margin="0,0,10,0" Stretch="Uniform"
-                                           Source="{Binding ThumbnailPath, Converter={StaticResource ThumbnailPathConverter}}"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding DisplayName}" FontWeight="Bold"
-                                               VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                                    <StackPanel Grid.Column="2" Orientation="Horizontal">
-                                        <Button Content="정보" Width="60" Margin="4,0" Click="InfoButton_Click"/>
-                                        <Button Content="실행" Width="70" Margin="4,0" Click="RunButton_Click"
+                <!-- 리스트 보기(테이블) — 썸네일 없이 칼럼으로 정보를 보여준다. 보기 > 리스트 보기를 고르면
+                     보인다(doc/game-management.md "메인 화면" 참고). "게임 이름"/"정보"/"실행" 칼럼은 항상
+                     보이고, 나머지(버전/평점/신사 등급/폴더)는 헤더 우클릭 메뉴로 켜고 끌 수 있다 —
+                     MainWindow.xaml.cs의 RebuildListColumns가 켜진 칼럼만 골라 Columns에 순서대로 채운다. -->
+                <ListView x:Name="GamesListView" Visibility="Collapsed"
+                          ScrollViewer.HorizontalScrollBarVisibility="Auto">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="ContextMenu" Value="{StaticResource GameCardContextMenu}"/>
+                            <Setter Property="AllowDrop" Value="True"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <EventSetter Event="DragOver" Handler="Card_DragOver"/>
+                            <EventSetter Event="Drop" Handler="Card_Drop"/>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+                    <ListView.View>
+                        <GridView x:Name="GamesGridView">
+                            <GridView.ColumnHeaderContainerStyle>
+                                <Style TargetType="GridViewColumnHeader">
+                                    <Setter Property="ContextMenu" Value="{StaticResource ListColumnVisibilityMenu}"/>
+                                </Style>
+                            </GridView.ColumnHeaderContainerStyle>
+                            <GridViewColumn x:Name="NameColumn" Header="게임 이름" Width="160">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn x:Name="VersionColumn" Header="버전" Width="70">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Version}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn x:Name="RatingColumn" Header="평점" Width="60">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Rating, StringFormat={}{0:0}%}" VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn x:Name="GentlemanGradeColumn" Header="신사 등급" Width="80">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding GentlemanGrade, StringFormat={}{0:0}%}" VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn x:Name="FolderColumn" Header="폴더" Width="240">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding FolderPath}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn x:Name="InfoColumn" Header="정보" Width="60">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="정보" Width="50" Click="InfoButton_Click"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn x:Name="RunColumn" Header="실행" Width="70">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="실행" Width="60" Click="RunButton_Click"
                                                 IsEnabled="{Binding IsRunButtonEnabled}"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                        </GridView>
+                    </ListView.View>
+                </ListView>
             </Grid>
         </ScrollViewer>
     </DockPanel>

@@ -55,8 +55,13 @@ public class GameItem : INotifyPropertyChanged
     public string? ExecutablePath
     {
         get => _executablePath;
-        set { if (_executablePath != value) { _executablePath = value; OnPropertyChanged(); } }
+        set { if (_executablePath != value) { _executablePath = value; OnPropertyChanged(); OnPropertyChanged(nameof(FolderPath)); } }
     }
+
+    /// <summary>실행 파일이 들어 있는 폴더 경로 — 메인 화면 리스트 보기(테이블)의 "폴더" 칼럼 표시용.
+    /// 저장하지 않는 계산 값이며, <see cref="ExecutablePath"/>가 없으면 빈 문자열이다.</summary>
+    [JsonIgnore]
+    public string FolderPath => string.IsNullOrEmpty(ExecutablePath) ? string.Empty : (Path.GetDirectoryName(ExecutablePath) ?? string.Empty);
 
     /// <summary>메인 카드 대표 썸네일 경로. 원본 크기 그대로 저장하고, 화면에는 스케일해서 보여준다
     /// (doc/game-management.md "대표 썸네일 지정" 참고 — 별도의 리사이즈본을 만들지 않는다).</summary>

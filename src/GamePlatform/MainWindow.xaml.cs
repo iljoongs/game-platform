@@ -69,6 +69,15 @@ public partial class MainWindow : Window
         ApplyViewMode(viewMode);
         UpdateViewModeMenuChecks(viewMode);
 
+        // ListColumnVisibilityMenu의 MenuItem들은 Window.Resources 안에 있어 x:Name으로 필드가 생성되지
+        // 않으므로, 리소스 자체를 찾아 순서(XAML 선언 순서: 버전/평점/신사 등급/폴더)로 접근한다.
+        var columnMenu = (ContextMenu)Resources["ListColumnVisibilityMenu"];
+        ((MenuItem)columnMenu.Items[0]).IsChecked = _settings.ListShowVersion;
+        ((MenuItem)columnMenu.Items[1]).IsChecked = _settings.ListShowRating;
+        ((MenuItem)columnMenu.Items[2]).IsChecked = _settings.ListShowGentlemanGrade;
+        ((MenuItem)columnMenu.Items[3]).IsChecked = _settings.ListShowFolder;
+        RebuildListColumns();
+
         ApplyWindowBounds();
 
         BackupService.CheckAndBackup(_settings, _currentGamesPath);
@@ -520,6 +529,44 @@ public partial class MainWindow : Window
     {
         ListViewMenuItem.IsChecked = mode == GameViewMode.List;
         IconViewMenuItem.IsChecked = mode == GameViewMode.Icon;
+    }
+
+    /// <summary>리스트 보기(테이블) 헤더 우클릭 메뉴의 버전/평점/신사 등급/폴더 항목 — 넷 다 `IsCheckable`이라
+    /// 클릭 시점에는 이미 새 체크 상태로 바뀌어 있으므로, 그 값을 그대로 설정에 반영하고 칼럼 목록을 다시
+    /// 구성한다.</summary>
+    private void ToggleVersionColumn_Click(object sender, RoutedEventArgs e) => ToggleListColumn(sender, v => _settings.ListShowVersion = v);
+
+    private void ToggleRatingColumn_Click(object sender, RoutedEventArgs e) => ToggleListColumn(sender, v => _settings.ListShowRating = v);
+
+    private void ToggleGentlemanGradeColumn_Click(object sender, RoutedEventArgs e) => ToggleListColumn(sender, v => _settings.ListShowGentlemanGrade = v);
+
+    private void ToggleFolderColumn_Click(object sender, RoutedEventArgs e) => ToggleListColumn(sender, v => _settings.ListShowFolder = v);
+
+    private void ToggleListColumn(object sender, Action<bool> applyToSettings)
+    {
+        if (sender is not MenuItem menuItem)
+        {
+            return;
+        }
+
+        applyToSettings(menuItem.IsChecked);
+        RebuildListColumns();
+        SettingsRepository.Save(_settings);
+    }
+
+    /// <summary>리스트 보기 테이블의 칼럼을 "게임 이름/버전/평점/신사 등급/폴더/정보/실행" 고정 순서로 다시
+    /// 채운다 — 버전/평점/신사 등급/폴더는 설정에서 꺼져 있으면 통째로 뺀다. `GridViewColumn`은 일반 시각
+    /// 요소가 아니라 매번 새로 만들 필요 없이 Columns 컬렉션에서 넣었다 뺐다 할 수 있다.</summary>
+    private void RebuildListColumns()
+    {
+        GamesGridView.Columns.Clear();
+        GamesGridView.Columns.Add(NameColumn);
+        if (_settings.ListShowVersion) GamesGridView.Columns.Add(VersionColumn);
+        if (_settings.ListShowRating) GamesGridView.Columns.Add(RatingColumn);
+        if (_settings.ListShowGentlemanGrade) GamesGridView.Columns.Add(GentlemanGradeColumn);
+        if (_settings.ListShowFolder) GamesGridView.Columns.Add(FolderColumn);
+        GamesGridView.Columns.Add(InfoColumn);
+        GamesGridView.Columns.Add(RunColumn);
     }
 
     #region 게임 목록 파일 (열기 / 저장 / 다른 이름으로 저장)
