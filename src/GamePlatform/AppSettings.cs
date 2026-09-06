@@ -24,6 +24,11 @@ public class AppSettings
     public bool ListShowGentlemanGrade { get; set; } = true;
     public bool ListShowFolder { get; set; } = true;
 
+    /// <summary>리스트 보기(테이블) 칼럼 너비 — 사용자가 헤더 경계를 드래그해서 조절하면 저장되어 다음 실행에도
+    /// 유지된다(doc/game-management.md "메인 화면" 참고). 키는 칼럼 이름("Name"/"Version"/"Rating"/
+    /// "GentlemanGrade"/"Folder"/"Info"/"Run", `MainWindow._listColumnKeys` 참고).</summary>
+    public Dictionary<string, double> ListColumnWidths { get; set; } = new();
+
     public double? MainWindowWidth { get; set; }
     public double? MainWindowHeight { get; set; }
     public double? MainWindowLeft { get; set; }

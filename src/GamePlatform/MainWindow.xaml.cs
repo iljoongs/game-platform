@@ -19,6 +19,11 @@ public partial class MainWindow : Window
     private readonly AppSettings _settings;
     private readonly ICollectionView _gamesView;
 
+    /// <summary>리스트 보기(테이블) 칼럼 객체 ↔ 설정에 저장할 때 쓰는 이름. <see cref="ApplyListColumnWidths"/>가
+    /// 시작할 때 저장된 너비를 적용하고, 이후 각 칼럼의 `Width`가 바뀔 때마다(사용자가 헤더 경계를 드래그)
+    /// 그 이름으로 <see cref="AppSettings.ListColumnWidths"/>에 저장한다.</summary>
+    private Dictionary<GridViewColumn, string> _listColumnKeys = new();
+
     /// <summary>지금 저장/불러오기 대상인 게임 목록 파일. 기본값은 <see cref="AppPaths.GamesPath"/>이지만
     /// 파일 메뉴의 "열기"/"다른 이름으로 저장"으로 바뀔 수 있다 — 그 뒤로는 자동 저장(<see cref="SaveState"/>)도
     /// 이 경로를 따라간다(doc/game-management.md "게임 목록 파일 관리" 참고).</summary>
@@ -77,6 +82,7 @@ public partial class MainWindow : Window
         ((MenuItem)columnMenu.Items[2]).IsChecked = _settings.ListShowGentlemanGrade;
         ((MenuItem)columnMenu.Items[3]).IsChecked = _settings.ListShowFolder;
         RebuildListColumns();
+        ApplyListColumnWidths();
 
         ApplyWindowBounds();
 
@@ -567,6 +573,47 @@ public partial class MainWindow : Window
         if (_settings.ListShowFolder) GamesGridView.Columns.Add(FolderColumn);
         GamesGridView.Columns.Add(InfoColumn);
         GamesGridView.Columns.Add(RunColumn);
+    }
+
+    /// <summary>저장된 리스트 보기 칼럼 너비(<see cref="AppSettings.ListColumnWidths"/>)를 한 번 적용하고,
+    /// 이후 사용자가 헤더 경계를 드래그해서 너비를 바꿀 때마다 다시 저장하도록 건다. `GridViewColumn.Width`는
+    /// 보통의 CLR 이벤트가 없는 의존 속성이라 `DependencyPropertyDescriptor`로 변경을 감시한다 — 칼럼을
+    /// 숨겼다 다시 보여도(<see cref="RebuildListColumns"/>) 같은 칼럼 객체를 재사용하므로 이 훅은 시작할 때
+    /// 한 번만 걸면 된다.</summary>
+    private void ApplyListColumnWidths()
+    {
+        _listColumnKeys = new Dictionary<GridViewColumn, string>
+        {
+            [NameColumn] = "Name",
+            [VersionColumn] = "Version",
+            [RatingColumn] = "Rating",
+            [GentlemanGradeColumn] = "GentlemanGrade",
+            [FolderColumn] = "Folder",
+            [InfoColumn] = "Info",
+            [RunColumn] = "Run",
+        };
+
+        foreach (var (column, key) in _listColumnKeys)
+        {
+            if (_settings.ListColumnWidths.TryGetValue(key, out var width))
+            {
+                column.Width = width;
+            }
+
+            DependencyPropertyDescriptor.FromProperty(GridViewColumn.WidthProperty, typeof(GridViewColumn))
+                .AddValueChanged(column, ListColumnWidth_Changed);
+        }
+    }
+
+    private void ListColumnWidth_Changed(object? sender, EventArgs e)
+    {
+        if (sender is not GridViewColumn column || !_listColumnKeys.TryGetValue(column, out var key))
+        {
+            return;
+        }
+
+        _settings.ListColumnWidths[key] = column.Width;
+        SettingsRepository.Save(_settings);
     }
 
     #region 게임 목록 파일 (열기 / 저장 / 다른 이름으로 저장)
