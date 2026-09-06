@@ -17,14 +17,16 @@
         <local:ProgressColorConverter x:Key="ProgressColorConverter"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibleConverter"/>
 
-        <!-- 평점/신사 등급 슬라이더의 "채워진 부분"(흰색)과 "안 채워진 부분"(투명 — 뒤의 색 트랙이 그대로
-             보임) — 기본 RepeatButton 크롬을 걷어내고 단색 Border만 남긴다. -->
+        <!-- 평점/신사 등급 슬라이더의 "채워진 부분"(진행 정도에 따라 색이 바뀜)과 "안 채워진 부분"(연한 회색
+             배경) — 기본 RepeatButton 크롬을 걷어내고 단색 Border만 남긴다. 공유 스타일이라 TemplatedParent가
+             아니라 AncestorType=Slider로 값을 찾는다. -->
         <Style x:Key="RatingFillRepeatButtonStyle" TargetType="RepeatButton">
             <Setter Property="OverridesDefaultStyle" Value="True"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RepeatButton">
-                        <Border Background="White" CornerRadius="13"/>
+                        <Border CornerRadius="13"
+                                Background="{Binding Value, RelativeSource={RelativeSource AncestorType=Slider}, Converter={StaticResource ProgressColorConverter}}"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -40,9 +42,10 @@
             </Setter>
         </Style>
 
-        <!-- sample.png 참고 — 진행률(0~100) 구간마다 트랙 색이 바뀌는 알약 모양 슬라이더. 보통
+        <!-- sample.png 참고 — 진행률(0~100) 구간마다 채워진 막대 색이 바뀌는 알약 모양 슬라이더(배경은
+             연한 회색 고정, 2026-09-06 수정 — 막대/배경 색을 서로 바꿔달라는 사용자 요청). 보통
              ProgressBar가 아니라 Slider를 쓰는 이유는 막대를 직접 클릭/드래그해서 값을 바로 지정해야
-             하기 때문이다(IsMoveToPointEnabled). Thumb은 크기 0으로 감춰서, 눈에는 흰 채움 막대가
+             하기 때문이다(IsMoveToPointEnabled). Thumb은 크기 0으로 감춰서, 눈에는 색 채움 막대가
              늘었다 줄었다 하는 것처럼만 보인다. -->
         <Style x:Key="RatingSliderStyle" TargetType="Slider">
             <Setter Property="IsMoveToPointEnabled" Value="True"/>
@@ -51,8 +54,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Slider">
                         <Grid>
-                            <Border CornerRadius="13"
-                                    Background="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource ProgressColorConverter}}"/>
+                            <Border CornerRadius="13" Background="#E3E3E3"/>
                             <Track x:Name="PART_Track">
                                 <Track.DecreaseRepeatButton>
                                     <RepeatButton Style="{StaticResource RatingFillRepeatButtonStyle}" Command="Slider.DecreaseLarge"/>
@@ -98,15 +100,53 @@
                      Height="140" VerticalScrollBarVisibility="Auto"
                      TextChanged="DescriptionTextBox_TextChanged" Margin="0,2,0,10"/>
 
-            <TextBlock Text="{Binding Value, ElementName=RatingSlider, StringFormat=평점 ({0:0}%)}"/>
-            <Slider x:Name="RatingSlider" Style="{StaticResource RatingSliderStyle}"
-                    Minimum="0" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1"
-                    ValueChanged="RatingSlider_ValueChanged" Margin="0,2,0,10"/>
+            <Grid Margin="0,0,0,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="16"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-            <TextBlock Text="{Binding Value, ElementName=GentlemanGradeSlider, StringFormat=신사 등급 ({0:0}%)}"/>
-            <Slider x:Name="GentlemanGradeSlider" Style="{StaticResource RatingSliderStyle}"
-                    Minimum="0" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1"
-                    ValueChanged="GentlemanGradeSlider_ValueChanged" Margin="0,2,0,10"/>
+                <StackPanel Grid.Column="0">
+                    <TextBlock Text="평점"/>
+                    <Grid Margin="0,2,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider x:Name="RatingSlider" Grid.Column="0" Style="{StaticResource RatingSliderStyle}"
+                                Minimum="0" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1"
+                                ValueChanged="RatingSlider_ValueChanged"/>
+                        <Button Grid.Column="1" Content="&lt;" Width="22" Margin="4,0,0,0" Click="RatingDecrease_Click"/>
+                        <TextBox x:Name="RatingTextBox" Grid.Column="2" Width="40" Margin="4,0,0,0"
+                                 TextAlignment="Center" VerticalContentAlignment="Center"
+                                 TextChanged="RatingTextBox_TextChanged"/>
+                        <Button Grid.Column="3" Content="&gt;" Width="22" Margin="4,0,0,0" Click="RatingIncrease_Click"/>
+                    </Grid>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2">
+                    <TextBlock Text="신사 등급"/>
+                    <Grid Margin="0,2,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Slider x:Name="GentlemanGradeSlider" Grid.Column="0" Style="{StaticResource RatingSliderStyle}"
+                                Minimum="0" Maximum="100" IsSnapToTickEnabled="True" TickFrequency="1"
+                                ValueChanged="GentlemanGradeSlider_ValueChanged"/>
+                        <Button Grid.Column="1" Content="&lt;" Width="22" Margin="4,0,0,0" Click="GentlemanGradeDecrease_Click"/>
+                        <TextBox x:Name="GentlemanGradeTextBox" Grid.Column="2" Width="40" Margin="4,0,0,0"
+                                 TextAlignment="Center" VerticalContentAlignment="Center"
+                                 TextChanged="GentlemanGradeTextBox_TextChanged"/>
+                        <Button Grid.Column="3" Content="&gt;" Width="22" Margin="4,0,0,0" Click="GentlemanGradeIncrease_Click"/>
+                    </Grid>
+                </StackPanel>
+            </Grid>
 
             <TextBlock Text="게임 요약 (첫 번째는 메인 화면 대표 썸네일입니다. 이 창에 이미지를 끌어다 놓으면 추가됩니다. 클릭하면 원본 크기로 봅니다. 우클릭으로 삭제)"
                        TextWrapping="Wrap"/>

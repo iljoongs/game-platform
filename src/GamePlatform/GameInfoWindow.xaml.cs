@@ -19,6 +19,8 @@ public partial class GameInfoWindow : Window
     private readonly AppSettings _settings;
     private readonly Action _onChanged;
     private readonly bool _isLoading;
+    private bool _isSyncingRating;
+    private bool _isSyncingGentlemanGrade;
 
     /// <summary>게임 요약 갤러리에 실제로 보여주는 목록. 맨 앞에 메인 화면 대표 썸네일(<see cref="ScreenshotItem.IsCover"/>)을
     /// 얹고 그 뒤에 <see cref="GameItem.Screenshots"/>를 이어붙인 것 — <see cref="RefreshGallery"/>로 다시 만든다.</summary>
@@ -38,7 +40,9 @@ public partial class GameInfoWindow : Window
         DescriptionTextBox.Text = item.Description;
         ExecutablePathTextBox.Text = item.ExecutablePath;
         RatingSlider.Value = item.Rating;
+        RatingTextBox.Text = item.Rating.ToString("0");
         GentlemanGradeSlider.Value = item.GentlemanGrade;
+        GentlemanGradeTextBox.Text = item.GentlemanGrade.ToString("0");
         ScreenshotsItemsControl.ItemsSource = _gallery;
         RefreshGallery();
         RefreshArchiveInfo();
@@ -134,14 +138,81 @@ public partial class GameInfoWindow : Window
     private void RatingSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_isLoading) return;
-        _item.Rating = RatingSlider.Value;
+        SetRating(RatingSlider.Value);
+    }
+
+    private void RatingTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isLoading || _isSyncingRating) return;
+        if (double.TryParse(RatingTextBox.Text, out var value))
+        {
+            SetRating(value);
+        }
+    }
+
+    private void RatingDecrease_Click(object sender, RoutedEventArgs e) => SetRating(RatingSlider.Value - 1);
+
+    private void RatingIncrease_Click(object sender, RoutedEventArgs e) => SetRating(RatingSlider.Value + 1);
+
+    /// <summary>평점 슬라이더/텍스트박스/±버튼 중 어디서 값이 바뀌든 이 메서드 하나로 모은다 — 셋을 항상
+    /// 같은 값으로 맞추고 딱 한 번만 저장한다. <see cref="_isSyncingRating"/>으로 서로 값을 되돌려 쓰다가
+    /// 무한 루프에 빠지는 것을 막는다(슬라이더 값을 바꾸면 TextChanged가, 텍스트를 바꾸면 ValueChanged가
+    /// 다시 불리기 때문).</summary>
+    private void SetRating(double value)
+    {
+        if (_isLoading || _isSyncingRating) return;
+        _isSyncingRating = true;
+        try
+        {
+            value = Math.Clamp(value, RatingSlider.Minimum, RatingSlider.Maximum);
+            _item.Rating = value;
+            RatingSlider.Value = value;
+            RatingTextBox.Text = value.ToString("0");
+        }
+        finally
+        {
+            _isSyncingRating = false;
+        }
+
         _onChanged();
     }
 
     private void GentlemanGradeSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (_isLoading) return;
-        _item.GentlemanGrade = GentlemanGradeSlider.Value;
+        SetGentlemanGrade(GentlemanGradeSlider.Value);
+    }
+
+    private void GentlemanGradeTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isLoading || _isSyncingGentlemanGrade) return;
+        if (double.TryParse(GentlemanGradeTextBox.Text, out var value))
+        {
+            SetGentlemanGrade(value);
+        }
+    }
+
+    private void GentlemanGradeDecrease_Click(object sender, RoutedEventArgs e) => SetGentlemanGrade(GentlemanGradeSlider.Value - 1);
+
+    private void GentlemanGradeIncrease_Click(object sender, RoutedEventArgs e) => SetGentlemanGrade(GentlemanGradeSlider.Value + 1);
+
+    /// <summary>신사 등급 쪽의 <see cref="SetRating"/>과 같은 역할.</summary>
+    private void SetGentlemanGrade(double value)
+    {
+        if (_isLoading || _isSyncingGentlemanGrade) return;
+        _isSyncingGentlemanGrade = true;
+        try
+        {
+            value = Math.Clamp(value, GentlemanGradeSlider.Minimum, GentlemanGradeSlider.Maximum);
+            _item.GentlemanGrade = value;
+            GentlemanGradeSlider.Value = value;
+            GentlemanGradeTextBox.Text = value.ToString("0");
+        }
+        finally
+        {
+            _isSyncingGentlemanGrade = false;
+        }
+
         _onChanged();
     }
 
