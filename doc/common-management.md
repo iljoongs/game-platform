@@ -42,6 +42,8 @@ D:\game\GamePlatform\
 
 게임의 실행 파일(exe)은 사용자가 이미 설치해 둔 임의의 위치(다른 드라이브, 읽기 전용 폴더 등)를 가리킬 수 있으므로, video-vault처럼 원본 파일과 같은 폴더에 썸네일을 저장하지 않고 앱 데이터 폴더 안에 게임 Id별로 모아 저장한다.
 
+**`games.json`을 앱이 아니라 PowerShell 등으로 직접 스크립트 수정할 일이 있으면(예: 여러 게임 폴더 이름을 일괄 정리하면서 `ExecutablePath`를 맞추는 경우), 먼저 [doc/release-folder-naming.md](release-folder-naming.md)의 "`games.json`을 PowerShell로 직접 스크립트 수정할 때 겪은 함정 3가지"를 읽는다** — 인코딩이 깨지거나 대소문자만 다른 변경이 조용히 스킵되는 문제를 실제로 겪었다.
+
 ### 옛 위치(`%LOCALAPPDATA%\GamePlatform\`)에서 자동 이동
 
 앱이 처음에 `%LOCALAPPDATA%\GamePlatform\`를 썼다가 이후 `D:\game\GamePlatform\`로 옮겼다(2026-09-05). 실제 사용자 데이터가 이미 쌓여 있었으므로, 새 버전을 켰을 때 자동으로 마이그레이션한다 (`AppPaths.EnsureAppDataDirectory`, `MainWindow` 시작 시 호출):
